@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@veloz/core": ["./packages/core/src/index.ts"],
+      "@veloz/dom": ["./packages/dom/src/index.ts"],
+      "@veloz/dom/jsx-runtime": ["./packages/dom/src/jsx-runtime.ts"],
+      "@veloz/dom/jsx-dev-runtime": ["./packages/dom/src/jsx-dev-runtime.ts"],
+      "@veloz/css": ["./packages/css/src/index.ts"],
+      "@veloz/ssr": ["./packages/ssr/src/index.ts"],
+      "@veloz/ssr/jsx-runtime": ["./packages/ssr/src/jsx-runtime.ts"],
+      "@veloz/ssr/jsx-dev-runtime": ["./packages/ssr/src/jsx-dev-runtime.ts"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@veloz/dom"
+  }
+}

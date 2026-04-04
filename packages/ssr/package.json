@@ -1,0 +1,38 @@
+{
+  "name": "@veloz/ssr",
+  "version": "0.1.0",
+  "description": "Veloz.js server-side rendering - renderToString, renderToStream, hydration",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js",
+      "require": "./dist/jsx-runtime.cjs"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js",
+      "require": "./dist/jsx-runtime.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "prebuild": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsup",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@veloz/core": "workspace:*",
+    "@veloz/css": "workspace:*"
+  },
+  "sideEffects": false,
+  "license": "MIT"
+}

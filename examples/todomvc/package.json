@@ -1,0 +1,21 @@
+{
+  "name": "veloz-example-todomvc",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@veloz/core": "workspace:*",
+    "@veloz/dom": "workspace:*",
+    "@veloz/css": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vite-plugin-veloz": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}

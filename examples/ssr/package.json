@@ -1,0 +1,23 @@
+{
+  "name": "veloz-example-ssr",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build --outDir dist/client",
+    "build:server": "vite build --outDir dist/server --ssr src/entry-server.tsx"
+  },
+  "dependencies": {
+    "@veloz/core": "workspace:*",
+    "@veloz/dom": "workspace:*",
+    "@veloz/css": "workspace:*",
+    "@veloz/ssr": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vite-plugin-veloz": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}

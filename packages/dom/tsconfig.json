@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@veloz/dom",
+    "paths": {
+      "@veloz/dom/jsx-runtime": ["./src/jsx-runtime.ts"],
+      "@veloz/dom/jsx-dev-runtime": ["./src/jsx-dev-runtime.ts"]
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["src"],
+  "exclude": ["dist"]
+}
