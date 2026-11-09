@@ -1,6 +1,40 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.1
+
+Fixes found while building a real site with 0.1.0. Upgrading is recommended for everyone.
+
+### Vite plugin
+
+- SSR now works when the packages come from `node_modules`: `@velozjs/dom` and `@velozjs/ssr` are no longer externalized, so app imports are redirected and a single copy of the SSR runtime is used. (In 0.1.0 this only worked with linked workspace packages.)
+- Vite 8 support: JSX is configured through `oxc` on Vite 8 and `esbuild` on older versions, based on the Vite that is running (`this.meta.viteVersion`), not on whichever `vite` copy the plugin happens to import.
+
+### Server rendering
+
+- `createEffect` and `onMount` no longer run during SSR, so browser-only code inside them can't crash the server.
+- A `renderToString` call nested inside another (e.g. islands rendered as separate roots) no longer resets the outer render's hydration and resource keys.
+- Internal markers use `Symbol.for`, so duplicated module copies still understand each other.
+
+### Rendering
+
+- `value`, `checked`, `selected` and `indeterminate` on form elements are applied after the other attributes and the children: `<select value>` selects an option rendered inside it, and `<input type="range" value>` isn't clamped when `value` is written before `min`/`max`.
+- Numbers in style objects get `px` (except unitless properties like `opacity`, `zIndex`, `lineHeight`), in the browser and in SSR.
+
+### Styles
+
+- `` css`...` `` scopes every nested rule: a rule without `&` is now a descendant of the class instead of leaking out as global CSS; bare declarations inside `@media`/`@supports`/`@container` are scoped; `@keyframes` and `@font-face` are kept as written; comments and braces inside strings are handled.
+- The `css` prop expands comma-separated nested selectors, adds `px` to numbers and keeps `@keyframes` unscoped.
+
+### Types
+
+- Each intrinsic element knows its DOM type: `ref` receives `HTMLDialogElement` on `<dialog>`, and event handlers get a typed `currentTarget` (`e.currentTarget.value` on an `<input>` needs no cast).
+- Every attribute accepts a value or an accessor, and SVG elements have their own attribute types.
+- `JSX.ElementType` (TypeScript 5.1+) separates what a component may return from the type of a JSX expression, so render-function children (`<Show>{(user) => ...}</Show>`, `<Match>`, `ErrorBoundary` fallbacks) get typed parameters.
+- `Dynamic` returns `JSX.Element`; new exported types: `DOMAttributes`, `EventHandler`, `TargetedEvent`, `Ref`, `StaticElement`.
+- `typesVersions` for `@velozjs/dom/jsx-runtime` and `@velozjs/ssr/jsx-runtime`, for projects using `moduleResolution: "node"`.
+- A compile-time test suite (`type-tests/`) now runs with `pnpm typecheck`.
+
+## 0.1.0
 
 First public release, published under the `@velozjs` scope (`@velozjs/core`, `@velozjs/dom`, `@velozjs/css`, `@velozjs/ssr`) and `vite-plugin-veloz`.
 

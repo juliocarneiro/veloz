@@ -1,6 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { Plugin } from 'vite';
+import { version as viteVersion, type Plugin, type UserConfig } from 'vite';
+
+function majorOf(version: string | undefined): number {
+  return Number.parseInt(version ?? '', 10) || 0;
+}
+const JSX_IMPORT_SOURCE = '@velozjs/dom';
 
 export interface VelozPluginOptions {
   /**
@@ -70,10 +75,22 @@ export default function velozPlugin(options: VelozPluginOptions = {}): Plugin {
     enforce: 'pre',
 
     config() {
+      // Vite 8 transforms with Oxc; earlier versions with esbuild. Ask the Vite
+      // that is running (this.meta, Vite 7+): the imported `vite` can be another
+      // copy, e.g. in a monorepo or when this plugin is linked.
+      const running = (this as { meta?: { viteVersion?: string } } | undefined)?.meta?.viteVersion;
+      const jsx =
+        majorOf(running ?? viteVersion) >= 8
+          ? { oxc: { jsx: { runtime: 'automatic', importSource: JSX_IMPORT_SOURCE } } }
+          : { esbuild: { jsx: 'automatic', jsxImportSource: JSX_IMPORT_SOURCE } };
       return {
-        esbuild: { jsx: 'automatic', jsxImportSource: '@velozjs/dom' },
+        ...jsx,
         resolve: { dedupe: ['@velozjs/core', '@velozjs/dom', '@velozjs/css', '@velozjs/ssr'] },
-      };
+        // Externalized dependencies are loaded by Node directly and never reach
+        // resolveId, so @velozjs/dom imports could not be redirected. Processing
+        // dom and ssr through Vite also keeps a single copy of the SSR runtime.
+        ssr: { noExternal: ['@velozjs/dom', '@velozjs/ssr'] },
+      } as UserConfig;
     },
 
     async resolveId(source, importer, resolveOptions) {

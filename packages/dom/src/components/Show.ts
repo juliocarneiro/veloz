@@ -1,5 +1,5 @@
 import { createMemo, access, type MaybeAccessor } from '@velozjs/core';
-import type { VelozNode } from '../types.js';
+import type { StaticElement, VelozNode } from '../types.js';
 
 export interface ShowProps<T> {
   /** Value or accessor; children render while it is truthy. */
@@ -9,7 +9,7 @@ export interface ShowProps<T> {
    * Nodes, or a function that receives the truthy value. A function renders
    * lazily and its effects are disposed when the condition turns false.
    */
-  children?: unknown | ((value: NonNullable<T>) => VelozNode);
+  children?: StaticElement | ((value: NonNullable<T>) => VelozNode);
 }
 
 /** Renders `children` while `when` is truthy, `fallback` otherwise. */

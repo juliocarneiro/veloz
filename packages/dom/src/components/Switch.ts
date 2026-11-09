@@ -1,11 +1,11 @@
 import { createMemo, access, type MaybeAccessor } from '@velozjs/core';
-import type { VelozNode } from '../types.js';
+import type { StaticElement, VelozNode } from '../types.js';
 
 const MATCH = Symbol.for('veloz.match');
 
 export interface MatchProps<T> {
   when: MaybeAccessor<T | undefined | null | false>;
-  children?: unknown | ((value: NonNullable<T>) => VelozNode);
+  children?: StaticElement | ((value: NonNullable<T>) => VelozNode);
 }
 
 interface MatchDescriptor {
@@ -15,7 +15,7 @@ interface MatchDescriptor {
 
 /** A branch of `<Switch>`. Renders nothing on its own. */
 export function Match<T>(props: MatchProps<T>): any {
-  return { [MATCH]: true, props } satisfies MatchDescriptor;
+  return { [MATCH]: true, props: props as MatchProps<unknown> } satisfies MatchDescriptor;
 }
 
 export interface SwitchProps {

@@ -1,9 +1,9 @@
 import { createSignal, catchError, untrack } from '@velozjs/core';
 import { toNodes } from '../jsx-runtime.js';
-import type { VelozNode } from '../types.js';
+import type { StaticElement, VelozNode } from '../types.js';
 
 export interface ErrorBoundaryProps {
-  fallback: VelozNode | ((error: Error, reset: () => void) => VelozNode);
+  fallback: StaticElement | ((error: Error, reset: () => void) => VelozNode);
   /**
    * Pass a function (`{() => <App />}`) so rendering happens inside the
    * boundary; JSX children written directly are created before it runs.

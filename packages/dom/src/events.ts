@@ -1,4 +1,4 @@
-const VELOZ_EVENTS = Symbol('veloz_events');
+const VELOZ_EVENTS = Symbol.for('veloz.events');
 
 /**
  * Bubbling events are delegated: one listener per event type on the document,
@@ -30,7 +30,7 @@ function ensureDelegated(doc: Document, eventName: string): void {
   doc.addEventListener(eventName, dispatchDelegated);
 }
 
-const HANDLED = Symbol('veloz_handled');
+const HANDLED = Symbol.for('veloz.handled');
 
 function dispatchDelegated(e: Event): void {
   // Render roots and the document both listen; handle each event once.

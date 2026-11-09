@@ -26,9 +26,26 @@ async function resolve(source: string, importer: string, ssr: boolean) {
 describe('vite-plugin-veloz', () => {
   const { appFile, libFile } = fixture();
 
-  it('compiles JSX with the @velozjs/dom runtime', () => {
-    const config = (velozPlugin() as any).config();
+  it('compiles JSX with the @velozjs/dom runtime (esbuild before Vite 8)', () => {
+    const config = (velozPlugin() as any).config.call({ meta: { viteVersion: '7.3.7' } });
     expect(config.esbuild).toMatchObject({ jsx: 'automatic', jsxImportSource: '@velozjs/dom' });
+    expect(config.oxc).toBeUndefined();
+  });
+
+  it('configures Oxc on Vite 8, using the running Vite version over the imported one', () => {
+    const config = (velozPlugin() as any).config.call({ meta: { viteVersion: '8.3.6' } });
+    expect(config.oxc).toEqual({ jsx: { runtime: 'automatic', importSource: '@velozjs/dom' } });
+    expect(config.esbuild).toBeUndefined();
+  });
+
+  it('falls back to the imported Vite version when the context has none (Vite 5/6)', () => {
+    const config = (velozPlugin() as any).config.call({});
+    expect(config.esbuild ?? config.oxc).toBeDefined();
+  });
+
+  it('keeps @velozjs/dom and @velozjs/ssr out of SSR externals so imports can be redirected', () => {
+    const config = (velozPlugin() as any).config();
+    expect(config.ssr.noExternal).toEqual(expect.arrayContaining(['@velozjs/dom', '@velozjs/ssr']));
   });
 
   it('redirects app imports to @velozjs/ssr during SSR, even inside a monorepo packages/ folder', async () => {

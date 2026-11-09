@@ -27,14 +27,12 @@ export type {
 // Same names as @velozjs/dom, so app code runs unchanged on the server.
 export {
   createSignal,
-  createEffect,
   createRenderEffect,
   createMemo,
   createRoot,
   batch,
   untrack,
   on,
-  onMount,
   onCleanup,
   createContext,
   useContext,
@@ -58,7 +56,14 @@ export type {
   ResourceState,
 } from '@velozjs/core';
 
-/** No-ops on the server, so shared code can import them from either package. */
+/**
+ * Effects and onMount are for browser side effects (DOM, timers, storage),
+ * so they don't run during server rendering. Memos and resources do.
+ */
+export function createEffect<T>(_fn: (prev: T | undefined) => T, _initialValue?: T): void {}
+export function onMount(_fn: () => void): void {}
+
+/** Browser-only entry points, so shared code can import them from either package. */
 export function render(): () => void {
   throw new Error('[Veloz SSR] render() runs in the browser. Use renderToString() on the server.');
 }

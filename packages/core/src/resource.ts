@@ -15,7 +15,7 @@ export interface SuspenseContext {
   decrement(): void;
 }
 
-const SUSPENSE = Symbol('veloz.suspense');
+const SUSPENSE = Symbol.for('veloz.suspense');
 
 /** Makes the current owner a Suspense boundary (used by `<Suspense>`). */
 export function provideSuspense(ctx: SuspenseContext): void {
@@ -58,9 +58,16 @@ export function setResourcePendingHandler(fn: ((key: string, promise: Promise<un
   store.onPending = fn;
 }
 
-/** Internal: restart automatic keys (`r0`, `r1`...) for a new render pass. */
-export function resetResourceKeys(): void {
+/** Internal: restart automatic keys (`r0`, `r1`...) for a new render pass; returns the previous position. */
+export function resetResourceKeys(): number {
+  const previous = store.counter;
   store.counter = 0;
+  return previous;
+}
+
+/** Internal: restore the key position saved by `resetResourceKeys` (nested renders). */
+export function restoreResourceKeys(position: number): void {
+  store.counter = position;
 }
 
 // ---------------------------------------------------------------------------

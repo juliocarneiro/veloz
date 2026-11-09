@@ -4,7 +4,7 @@ import { ComputationState } from './types.js';
 const { Clean, Pending, Dirty } = ComputationState;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const MAX_FLUSH_ITERATIONS = 100_000;
-const ERROR_HANDLER = Symbol('veloz.error');
+const ERROR_HANDLER = Symbol.for('veloz.error');
 
 let currentObserver: Computation | null = null;
 let currentOwner: Owner | null = null;
