@@ -1,4 +1,4 @@
-import { createSignal, createMemo } from '@veloz/core';
+import { createSignal, createMemo } from '@velozjs/core';
 
 export interface Todo {
   id: number;

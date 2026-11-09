@@ -37,6 +37,7 @@ describe('styled', () => {
     const Box = styled('button')`color: red;`;
     let clicked = false;
     const el = Box({ onClick: () => { clicked = true; } });
+    document.body.appendChild(el); // delegated events need the element in a document
     el.click();
     expect(clicked).toBe(true);
   });

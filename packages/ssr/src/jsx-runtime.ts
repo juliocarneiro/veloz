@@ -1,214 +1,192 @@
 import {
   createOwner,
   setCurrentOwner,
-} from '@veloz/core';
+  runWithOwner,
+  untrack,
+  type Owner,
+  URL_ATTRIBUTES,
+  isSafeAttributeURL,
+  isValidAttributeName,
+  isValidTagName,
+} from '@velozjs/core';
+import { processCssProp } from '@velozjs/css';
 import { escapeHTML, escapeAttr } from './escape.js';
 import { nextHydrationId } from './hydration.js';
-import { processCssProp } from './css-prop.js';
 
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
 ]);
 
-const DANGEROUS_URL_SCHEMES = /^(javascript|data|vbscript):/i;
-const URL_ATTRIBUTES = new Set([
-  'href', 'src', 'action', 'formaction', 'poster', 'srcset',
-  'background', 'cite', 'codebase', 'longdesc',
-]);
+/** JSX prop names that differ from the HTML attribute name. */
+const ATTRIBUTE_ALIASES: Record<string, string> = { htmlFor: 'for', className: 'class' };
+
+/**
+ * Markers around every dynamic region (a function child, or a component that
+ * returns a function on the client). `hydrate()` matches them in order.
+ */
+export const REGION_START = '<!--[-->';
+export const REGION_END = '<!--]-->';
 
 const RAW_HTML = Symbol('veloz_raw_html');
+const DEFERRED = Symbol('veloz_deferred');
+const MATCH = Symbol.for('veloz.match');
 
-interface RawHTML {
+/**
+ * A component's result, resolved when its parent renders it. The client
+ * evaluates functions returned by components at insertion time; doing the
+ * same here keeps hydration keys in the same order on both sides.
+ */
+interface Deferred {
+  [DEFERRED]: true;
+  value: unknown;
+  owner: Owner;
+}
+
+function isDeferred(value: unknown): value is Deferred {
+  return value != null && typeof value === 'object' && DEFERRED in value;
+}
+
+export interface RawHTML {
   [RAW_HTML]: true;
   value: string;
 }
 
-function rawHTML(value: string): RawHTML {
+export function rawHTML(value: string): RawHTML {
   return { [RAW_HTML]: true, value };
 }
 
-function isRawHTML(value: unknown): value is RawHTML {
+export function isRawHTML(value: unknown): value is RawHTML {
   return value != null && typeof value === 'object' && RAW_HTML in value;
 }
 
-export function jsx(
-  tag: string | Function,
-  props: Record<string, unknown> | null
-): RawHTML {
-  if (!props) props = {};
+export function region(html: string): RawHTML {
+  return rawHTML(REGION_START + html + REGION_END);
+}
 
-  if (typeof tag === 'function') {
-    return rawHTML(renderComponent(tag, props));
-  }
-
+export function jsx(tag: string | Function, props: Record<string, unknown> | null): any {
+  props ??= {};
+  if (typeof tag === 'function') return renderComponent(tag, props);
   return rawHTML(renderElement(tag, props));
 }
 
 export { jsx as jsxs, jsx as jsxDEV };
 
+/** Same as the client: children are passed through untouched. */
 export function Fragment(props: { children?: unknown }): RawHTML {
-  if (props.children == null) return rawHTML('');
   return rawHTML(renderChildren(props.children));
 }
 
-function renderComponent(
-  comp: Function,
-  props: Record<string, unknown>
-): string {
+function renderComponent(comp: Function, props: Record<string, unknown>): unknown {
   const owner = createOwner();
   const prevOwner = setCurrentOwner(owner);
-
-  const componentProps: Record<string, unknown> = Object.create(null);
-
-  const { children, ...restProps } = props;
-
-  for (const key of Object.keys(restProps)) {
-    const value = restProps[key];
-    if (typeof value === 'function' && !key.startsWith('on') && key !== 'ref') {
-      Object.defineProperty(componentProps, key, {
-        get: value as () => unknown,
-        enumerable: true,
-        configurable: true,
-      });
-    } else {
-      componentProps[key] = value;
-    }
-  }
-
-  if (children != null) {
-    componentProps.children = children;
-  }
-
   try {
-    const result = comp(componentProps);
-    return resolveToString(result);
+    const result = untrack(() => comp(props));
+    // <Match> descriptors are read by <Switch>; pass them through.
+    if (result != null && typeof result === 'object' && MATCH in result) return result;
+    if (isRawHTML(result) || typeof result === 'string' || result == null) return result;
+    return { [DEFERRED]: true, value: result, owner } satisfies Deferred;
   } finally {
     setCurrentOwner(prevOwner);
   }
 }
 
-function renderElement(
-  tag: string,
-  props: Record<string, unknown>
-): string {
+let warnedInnerHTML = false;
+
+function renderElement(tag: string, props: Record<string, unknown>): string {
+  if (!isValidTagName(tag)) throw new Error(`[Veloz SSR] Invalid tag name "${tag}".`);
+
   const hk = nextHydrationId();
   let html = `<${tag} data-hk="${hk}"`;
+  let classValue = props.css ? processCssProp(props.css as Record<string, unknown>) : '';
+  let content: string | null = null;
 
-  const { children, ...restProps } = props;
+  for (const key of Object.keys(props)) {
+    if (key === 'children' || key === 'css' || key === 'ref' || key === 'key') continue;
+    if (key.length > 2 && key.startsWith('on')) continue; // event handlers are client-only
 
-  let classValue = '';
-
-  if (restProps.css) {
-    const cssClass = processCssProp(restProps.css as Record<string, unknown>);
-    classValue = cssClass;
-  }
-
-  for (const key of Object.keys(restProps)) {
-    if (key === 'css' || key === 'ref') continue;
-    if (key.startsWith('on')) continue;
-
-    const raw = restProps[key];
-    const resolved = typeof raw === 'function' ? (raw as () => unknown)() : raw;
+    const raw = props[key];
+    const value = typeof raw === 'function' ? (raw as () => unknown)() : raw;
 
     if (key === 'class' || key === 'className') {
-      const cls = resolveClass(resolved);
-      classValue = classValue ? `${classValue} ${cls}` : cls;
+      const cls = resolveClass(value);
+      if (cls) classValue = classValue ? `${cls} ${classValue}` : cls;
       continue;
     }
-
     if (key === 'classList') {
-      const cls = resolveClassList(resolved as Record<string, boolean>);
-      if (cls) {
-        classValue = classValue ? `${classValue} ${cls}` : cls;
-      }
+      const cls = resolveClass(value);
+      if (cls) classValue = classValue ? `${classValue} ${cls}` : cls;
       continue;
     }
-
     if (key === 'style') {
-      const s = resolveStyle(resolved);
+      const s = resolveStyle(value);
       if (s) html += ` style="${escapeAttr(s)}"`;
       continue;
     }
-
-    if (key === 'innerHTML' || key === 'innerText' || key === 'textContent') {
+    if (key === 'innerHTML') {
+      // There is no DOM sanitizer on the server; the client sets it (sanitized).
+      if (value != null && !warnedInnerHTML && isDev()) {
+        warnedInnerHTML = true;
+        console.warn('[Veloz SSR] innerHTML is not rendered on the server; it is set (sanitized) on the client.');
+      }
+      continue;
+    }
+    if (key === 'textContent' || key === 'innerText') {
+      content = value == null ? '' : escapeHTML(String(value));
+      continue;
+    }
+    if (key === 'value' && tag === 'textarea') {
+      content = value == null ? '' : escapeHTML(String(value));
       continue;
     }
 
-    if (resolved == null || resolved === false) continue;
+    const name = ATTRIBUTE_ALIASES[key] ?? key;
+    if (!isValidAttributeName(name)) continue;
+    const isAria = name.startsWith('aria-');
+    if (value == null || (value === false && !isAria)) continue;
+    if (URL_ATTRIBUTES.has(name.toLowerCase()) && !isSafeAttributeURL(name, String(value))) continue;
 
-    if (URL_ATTRIBUTES.has(key.toLowerCase()) && typeof resolved === 'string') {
-      if (DANGEROUS_URL_SCHEMES.test(resolved.trim())) continue;
-    }
-
-    if (resolved === true) {
-      html += ` ${key}`;
-    } else {
-      html += ` ${key}="${escapeAttr(String(resolved))}"`;
-    }
+    html += value === true && !isAria ? ` ${name}` : ` ${name}="${escapeAttr(String(value))}"`;
   }
 
-  if (classValue) {
-    html += ` class="${escapeAttr(classValue)}"`;
-  }
-
+  if (classValue) html += ` class="${escapeAttr(classValue)}"`;
   html += '>';
 
-  if (VOID_ELEMENTS.has(tag)) {
-    return html;
-  }
+  if (VOID_ELEMENTS.has(tag.toLowerCase())) return html;
 
-  if (restProps.innerHTML != null) {
-    html += String(restProps.innerHTML);
-  } else if (restProps.textContent != null) {
-    html += escapeHTML(String(restProps.textContent));
-  } else {
-    html += renderChildren(children);
-  }
-
-  html += `</${tag}>`;
-  return html;
+  html += content ?? (props.innerHTML != null ? '' : renderChildren(props.children));
+  return html + `</${tag}>`;
 }
 
 export function renderChildren(children: unknown): string {
   if (children == null || typeof children === 'boolean') return '';
-
   if (isRawHTML(children)) return children.value;
-
+  if (isDeferred(children)) {
+    const { value, owner } = children;
+    return runWithOwner(owner, () => untrack(() => renderChildren(value)));
+  }
   if (typeof children === 'string') return escapeHTML(children);
   if (typeof children === 'number') return String(children);
 
   if (Array.isArray(children)) {
     let result = '';
-    for (const child of children) {
-      result += renderChildren(child);
-    }
+    for (const child of children) result += renderChildren(child);
     return result;
   }
 
   if (typeof children === 'function') {
-    const value = (children as () => unknown)();
-    return renderChildren(value);
+    return REGION_START + renderChildren((children as () => unknown)()) + REGION_END;
   }
 
+  if (typeof children === 'object' && MATCH in children) return '';
   return escapeHTML(String(children));
-}
-
-function resolveToString(value: unknown): string {
-  if (isRawHTML(value)) return value.value;
-  if (typeof value === 'string') return value;
-  if (value == null || typeof value === 'boolean') return '';
-  if (typeof value === 'number') return String(value);
-  if (Array.isArray(value)) return value.map(resolveToString).join('');
-  if (typeof value === 'function') return resolveToString((value as () => unknown)());
-  return String(value);
 }
 
 function resolveClass(value: unknown): string {
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(Boolean).join(' ');
+  if (Array.isArray(value)) return value.map(resolveClass).filter(Boolean).join(' ');
   if (value && typeof value === 'object') {
-    return Object.entries(value as Record<string, boolean>)
+    return Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v)
       .map(([k]) => k)
       .join(' ');
@@ -216,24 +194,21 @@ function resolveClass(value: unknown): string {
   return '';
 }
 
-function resolveClassList(value: Record<string, boolean> | null | undefined): string {
-  if (!value) return '';
-  return Object.entries(value)
-    .filter(([, v]) => v)
-    .map(([k]) => k)
-    .join(' ');
-}
-
 function resolveStyle(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object') {
-    const styles = value as Record<string, string>;
-    return Object.keys(styles)
-      .map((prop) => {
-        const cssKey = prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-        return `${cssKey}:${styles[prop]}`;
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v != null && v !== false)
+      .map(([prop, v]) => {
+        const key = prop.startsWith('--') ? prop : prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+        return `${key}:${v}`;
       })
       .join(';');
   }
   return '';
+}
+
+function isDev(): boolean {
+  const g = globalThis as { process?: { env?: Record<string, string | undefined> } };
+  return g.process?.env?.NODE_ENV !== 'production';
 }

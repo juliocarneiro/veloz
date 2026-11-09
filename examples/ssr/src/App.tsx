@@ -1,5 +1,5 @@
-import { createSignal } from '@veloz/core';
-import { Show, For } from '@veloz/dom';
+import { createSignal } from '@velozjs/core';
+import { Show, For } from '@velozjs/dom';
 import {
   headerArea, logo, badges, badge, badgeGreen, card, section, sectionTitle,
   articleTitle, articleBody, divider, counterArea, counterLabel, counterValue,

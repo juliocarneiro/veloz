@@ -1,4 +1,4 @@
-import { css } from '@veloz/css';
+import { css } from '@velozjs/css';
 
 export const headerArea = css`
   display: flex;

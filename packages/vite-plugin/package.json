@@ -1,25 +1,56 @@
 {
   "name": "vite-plugin-veloz",
   "version": "0.1.0",
-  "description": "Vite plugin for Veloz.js - JSX transform and HMR",
+  "description": "Vite plugin for Veloz: JSX setup and SSR module resolution.",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "veloz",
+    "velozjs",
+    "jsx",
+    "ssr"
+  ],
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
-    "clean": "rm -rf dist"
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "peerDependencies": {
     "vite": ">=5.0.0"
   },
-  "license": "MIT"
+  "devDependencies": {
+    "vite": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Julio Carneiro (https://juliocarneiro.dev)",
+  "license": "MIT",
+  "homepage": "https://github.com/juliocarneiro/veloz#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juliocarneiro/veloz.git",
+    "directory": "packages/vite-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/juliocarneiro/veloz/issues"
+  }
 }

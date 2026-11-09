@@ -1,3 +1,5 @@
+import { URL_ATTRIBUTES, isSafeAttributeURL } from '@velozjs/core';
+
 export interface SanitizeOptions {
   allowedTags?: Set<string>;
   allowedAttrs?: Set<string>;
@@ -21,28 +23,22 @@ const DEFAULT_ALLOWED_ATTRS = new Set([
   'aria-haspopup', 'aria-selected', 'aria-checked', 'aria-disabled',
 ]);
 
-const DANGEROUS_URL_SCHEMES = /^(javascript|data|vbscript):/i;
-const SAFE_DATA_IMAGE = /^data:image\/(png|gif|jpeg|jpg|webp|svg\+xml);base64,/i;
-
 let velozPolicy: unknown = null;
+let policyFailed = false;
 
 function getTrustedTypesPolicy(): unknown {
-  if (velozPolicy) return velozPolicy;
-  if (
-    typeof window !== 'undefined' &&
-    (window as any).trustedTypes?.createPolicy
-  ) {
-    velozPolicy = (window as any).trustedTypes.createPolicy('veloz-sanitize', {
-      createHTML: (input: string) => input,
-    });
+  if (velozPolicy || policyFailed) return velozPolicy;
+  const tt = typeof window !== 'undefined' ? (window as any).trustedTypes : undefined;
+  if (tt?.createPolicy) {
+    try {
+      // Only ever fed the output of the sanitizer below.
+      velozPolicy = tt.createPolicy('veloz-sanitize', { createHTML: (input: string) => input });
+    } catch {
+      // The CSP `trusted-types` directive does not allow this policy name.
+      policyFailed = true;
+    }
   }
   return velozPolicy;
-}
-
-function isURLSafe(url: string): boolean {
-  const trimmed = url.trim();
-  if (SAFE_DATA_IMAGE.test(trimmed)) return true;
-  return !DANGEROUS_URL_SCHEMES.test(trimmed);
 }
 
 export function sanitize(
@@ -89,7 +85,7 @@ function walkAndSanitize(
       for (const attr of attrs) {
         const name = attr.name.toLowerCase();
 
-        if (name.startsWith('on')) {
+        if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction') {
           el.removeAttribute(attr.name);
           continue;
         }
@@ -99,7 +95,7 @@ function walkAndSanitize(
           continue;
         }
 
-        if ((name === 'href' || name === 'src' || name === 'action') && !isURLSafe(attr.value)) {
+        if (URL_ATTRIBUTES.has(name) && !isSafeAttributeURL(name, attr.value)) {
           el.setAttribute(attr.name, 'about:blank');
         }
       }

@@ -1,5 +1,5 @@
-import { Show, For } from '@veloz/dom';
-import { createMemo, createEffect } from '@veloz/core';
+import { Show, For } from '@velozjs/dom';
+import { createMemo, createEffect } from '@velozjs/core';
 import { TodoItem } from './TodoItem';
 import {
   filteredTodos, remaining, totalCount, filter, setFilter,

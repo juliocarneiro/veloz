@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '../src/render';
 import { createElement } from '../src/jsx-runtime';
 import { For } from '../src/components/For';
-import { createSignal } from '@veloz/core';
+import { createSignal } from '@velozjs/core';
 
 describe('For', () => {
   it('should render a list of items', () => {

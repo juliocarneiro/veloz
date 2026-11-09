@@ -1,4 +1,4 @@
-import { css } from '@veloz/css';
+import { css } from '@velozjs/css';
 
 export const row = css`
   display: flex;

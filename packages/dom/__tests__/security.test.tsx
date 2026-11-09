@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { sanitize } from '../src/sanitizer';
 import { validateAttribute, sanitizeURL } from '../src/security';
 import { createElement } from '../src/jsx-runtime';
-import { validateKey } from '@veloz/core';
+import { validateKey } from '@velozjs/core';
 
 describe('XSS Prevention', () => {
   it('should escape text content by default (no innerHTML)', () => {

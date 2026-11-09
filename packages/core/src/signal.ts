@@ -1,21 +1,14 @@
-import type { SignalNode, Signal, Getter, Setter } from './types.js';
-import {
-  trackRead,
-  notifyObservers,
-  startBatch,
-  endBatch,
-  setCurrentObserver,
-} from './reactive.js';
+import type { SignalNode, Signal, Getter, Setter, SignalOptions } from './types.js';
+import { trackRead, notifyObservers, startBatch, endBatch, setCurrentObserver } from './reactive.js';
 
-export function createSignal<T>(
-  initialValue: T,
-  options?: { equals?: false | ((a: T, b: T) => boolean) }
-): Signal<T> {
+export function createSignal<T>(initialValue: T, options?: SignalOptions<T>): Signal<T>;
+export function createSignal<T = undefined>(): Signal<T | undefined>;
+export function createSignal<T>(initialValue?: T, options?: SignalOptions<T>): Signal<T> {
   const node: SignalNode<T> = {
-    value: initialValue,
-    observers: [],
-    observerSlots: [],
-    equals: options?.equals ?? defaultEquals,
+    value: initialValue as T,
+    observers: new Set(),
+    equals: options?.equals ?? Object.is,
+    comp: null,
   };
 
   const getter: Getter<T> = () => {
@@ -23,39 +16,31 @@ export function createSignal<T>(
     return node.value;
   };
 
-  const setter: Setter<T> = (
-    nextValue: T | ((prev: T) => T)
-  ): T => {
+  const setter = ((nextValue: T | ((prev: T) => T)): T => {
     const resolved =
-      typeof nextValue === 'function'
-        ? (nextValue as (prev: T) => T)(node.value)
-        : nextValue;
+      typeof nextValue === 'function' ? (nextValue as (prev: T) => T)(node.value) : nextValue;
 
-    if (node.equals !== false && node.equals(node.value, resolved)) {
-      return node.value;
-    }
+    if (node.equals !== false && node.equals(node.value, resolved)) return node.value;
 
     node.value = resolved;
     notifyObservers(node);
     return node.value;
-  };
+  }) as Setter<T>;
 
   return [getter, setter];
 }
 
-function defaultEquals<T>(a: T, b: T): boolean {
-  return Object.is(a, b);
-}
-
-export function batch(fn: () => void): void {
+/** Groups several writes so effects run once, after `fn` returns. */
+export function batch<T>(fn: () => T): T {
   startBatch();
   try {
-    fn();
+    return fn();
   } finally {
     endBatch();
   }
 }
 
+/** Reads signals inside `fn` without subscribing the current computation. */
 export function untrack<T>(fn: () => T): T {
   const prev = setCurrentObserver(null);
   try {
@@ -67,36 +52,40 @@ export function untrack<T>(fn: () => T): T {
 
 export type OnOptions = { defer?: boolean };
 
+type DepValues<D extends readonly Getter<unknown>[]> = { [K in keyof D]: ReturnType<D[K]> };
+
+/**
+ * Explicit dependencies: only `deps` are tracked; `fn` runs untracked.
+ * With `{ defer: true }`, `fn` is skipped on the first run.
+ */
 export function on<S, T>(
-  deps: Getter<S> | Getter<S>[],
-  fn: (value: S | S[], prev: S | S[] | undefined) => T,
+  deps: Getter<S>,
+  fn: (value: S, prev: S | undefined, prevResult: T | undefined) => T,
   options?: OnOptions
-): (prev?: T) => T {
+): (prevResult: T | undefined) => T | undefined;
+export function on<D extends readonly Getter<unknown>[], T>(
+  deps: [...D],
+  fn: (value: DepValues<D>, prev: DepValues<D> | undefined, prevResult: T | undefined) => T,
+  options?: OnOptions
+): (prevResult: T | undefined) => T | undefined;
+export function on(
+  deps: Getter<unknown> | Getter<unknown>[],
+  fn: (value: any, prev: any, prevResult: any) => unknown,
+  options?: OnOptions
+): (prevResult: unknown) => unknown {
   const isArray = Array.isArray(deps);
-  let prevValues: S | S[] | undefined;
-  let isFirst = true;
+  let prevValues: unknown;
+  let defer = options?.defer ?? false;
 
-  return () => {
-    let currentValues: S | S[];
-    if (isArray) {
-      currentValues = (deps as Getter<S>[]).map((d) => d());
-    } else {
-      currentValues = (deps as Getter<S>)();
+  return (prevResult) => {
+    const values = isArray ? (deps as Getter<unknown>[]).map((d) => d()) : (deps as Getter<unknown>)();
+    if (defer) {
+      defer = false;
+      prevValues = values;
+      return undefined;
     }
-
-    if (isFirst && options?.defer) {
-      isFirst = false;
-      prevValues = isArray
-        ? [...(currentValues as S[])]
-        : currentValues;
-      return undefined as unknown as T;
-    }
-
-    const result = untrack(() => fn(currentValues, prevValues));
-    prevValues = isArray
-      ? [...(currentValues as S[])]
-      : currentValues;
-    isFirst = false;
+    const result = untrack(() => fn(values, prevValues, prevResult));
+    prevValues = values;
     return result;
   };
 }

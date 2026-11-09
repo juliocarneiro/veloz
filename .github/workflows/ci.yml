@@ -6,55 +6,37 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    name: Test
+    name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        node-version: [18, 20, 22]
-
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
+      - uses: pnpm/action-setup@v4 # version from package.json "packageManager"
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
 
-      - run: pnpm install --no-frozen-lockfile
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Build packages
-        run: pnpm build
-
-  security:
-    name: Security Audit
+  audit:
+    name: Dependency audit
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
-
-      - run: pnpm install --no-frozen-lockfile
-
-      - name: Run security tests
-        run: pnpm vitest run --project dom -- security
-
-      - name: Audit dependencies
-        run: pnpm audit --audit-level=high || true
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high --prod

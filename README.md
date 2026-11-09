@@ -1,393 +1,294 @@
-# Veloz.js
+# Veloz
 
-**A blazing fast reactive frontend framework with fine-grained reactivity.**
+**Fine-grained reactive UI with JSX. No virtual DOM, no re-renders: signals update the exact DOM nodes that depend on them.**
 
-No Virtual DOM. No diffing. Just surgical DOM updates powered by Signals.
+[Português](README.pt-BR.md)
 
----
+- **Signals, memos and effects** with glitch-free, batched updates and automatic cleanup.
+- **Components run once.** JSX creates real DOM nodes; reactivity lives in the functions you pass.
+- **SSR and hydration**: `renderToString` on the server, `hydrate` on the client, same components.
+- **Scoped CSS-in-JS**: `css`, `styled` and the `css` prop. CSP-friendly, collected during SSR.
+- **Secure by default**: text is never parsed as HTML, URLs and attribute names are validated, `innerHTML` is sanitized.
+- **TypeScript-first**, ESM-only, no runtime dependencies.
 
-## Features
+## Packages
 
-- **Fine-grained Reactivity** - Updates only what changed, nothing more
-- **Signals** - Simple `[getter, setter]` reactive primitives
-- **JSX/TSX** - Write native JSX that compiles to real DOM operations
-- **Components run once** - No re-renders, no reconciliation
-- **CSS-in-JS** - Built-in `css`, `styled`, and `css` prop with automatic scoping
-- **Secure by default** - Built-in XSS prevention, HTML sanitization, CSP-compatible
-- **TypeScript-first** - Written 100% in TypeScript with full generic types
-- **Tiny bundle** - Zero runtime overhead from Virtual DOM diffing
-- **Trusted Types** - Native browser API integration for maximum XSS protection
-- **Server-Side Rendering** - Built-in SSR with `renderToString`, streaming, and automatic hydration
+| Package | What it does |
+| --- | --- |
+| [`@velozjs/core`](packages/core) | Signals, memos, effects, ownership, context. Works anywhere (no DOM). |
+| [`@velozjs/dom`](packages/dom) | JSX runtime, `render`, `hydrate`, `Show`, `For`, `Switch`, `ErrorBoundary`, `Portal`, sanitizer. |
+| [`@velozjs/css`](packages/css) | `css`, `styled`, the `css` prop, SSR style collection. |
+| [`@velozjs/ssr`](packages/ssr) | `renderToString`, `renderToStream`, server versions of the components. |
+| [`vite-plugin-veloz`](packages/vite-plugin) | JSX setup and SSR module resolution for Vite. |
 
-## Quick Start
+## Quick start
 
 ```bash
-# Create a new project
-mkdir my-app && cd my-app
-npm init -y
-npm install @veloz/core @veloz/dom @veloz/css @veloz/ssr
+npm install @velozjs/dom @velozjs/css
 npm install -D vite vite-plugin-veloz typescript
 ```
 
-**vite.config.ts**
-
-```typescript
+```ts
+// vite.config.ts
 import { defineConfig } from 'vite';
 import veloz from 'vite-plugin-veloz';
 
-export default defineConfig({
-  plugins: [veloz()],
-});
+export default defineConfig({ plugins: [veloz()] });
 ```
 
-**src/App.tsx**
+```json
+// tsconfig.json (compilerOptions)
+{ "jsx": "react-jsx", "jsxImportSource": "@velozjs/dom" }
+```
 
 ```tsx
-import { createSignal, createMemo } from '@veloz/dom';
-import { Show } from '@veloz/dom';
-import { css, styled } from '@veloz/css';
+// src/main.tsx
+import { render, createSignal, createMemo, Show } from '@velozjs/dom';
+import '@velozjs/css';
 
-const container = css`
-  text-align: center;
-  padding: 3rem;
-`;
-
-const Count = styled('div')`
-  font-size: 4rem;
-  font-weight: bold;
-  margin: 1rem 0;
-`;
-
-const Button = styled('button')`
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 0.5rem;
-  background: #6c63ff;
-  color: #fff;
-  cursor: pointer;
-  &:hover { background: #5a52d5; }
-  &:active { transform: scale(0.95); }
-`;
-
-export function App() {
+function Counter() {
   const [count, setCount] = createSignal(0);
   const doubled = createMemo(() => count() * 2);
 
   return (
-    <div class={container}>
-      <h1>Veloz.js</h1>
-      <Count>{() => String(count())}</Count>
-      <p>Doubled: {() => String(doubled())}</p>
-      <div css={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        <Button onClick={() => setCount(c => c - 1)}>- 1</Button>
-        <Button onClick={() => setCount(c => c + 1)}>+ 1</Button>
-        <Button onClick={() => setCount(0)}>Reset</Button>
-      </div>
-      <Show when={() => count() > 10}>
-        <p>Count is over 10!</p>
+    <div css={{ display: 'grid', gap: '0.5rem', placeItems: 'center' }}>
+      <p>Count: {count} · doubled: {doubled}</p>
+      <button onClick={() => setCount((c) => c + 1)}>Add one</button>
+      <Show when={() => count() >= 10}>
+        <p>That's a lot of clicks.</p>
       </Show>
     </div>
   );
 }
+
+render(() => <Counter />, document.getElementById('app')!);
 ```
 
-**src/main.tsx**
+`{count}` works because a getter is a function: any function in JSX becomes a live region that updates when the signals it reads change.
+
+## The mental model
+
+A Veloz component is a plain function that **runs once** and returns DOM nodes. Nothing re-runs on its own. What changes are the **functions** you put in JSX:
 
 ```tsx
-import { render } from '@veloz/dom';
-import '@veloz/css';
-import { App } from './App';
-
-render(() => <App />, document.getElementById('app')!);
+<p class={() => (done() ? 'done' : '')}>   {/* reactive attribute */}
+  {() => `${left()} items left`}           {/* reactive text */}
+</p>
 ```
 
-## CSS-in-JS Module (`@veloz/css`)
+Three rules cover almost everything:
 
-Veloz.js includes a built-in CSS module with **3 APIs** and **automatic scoping** per component. All styles are CSP-compatible (injected via `CSSStyleSheet` API, no `eval` or inline scripts).
+1. **Read signals inside functions** (`{() => a() + b()}`, `class={() => ...}`), not in the component body, if you want updates.
+2. **Props are passed as they are.** A function prop stays a function, so callbacks and render props just work. To accept a value *or* a signal, type it as `MaybeAccessor<T>` and read it with `access(props.x)`.
+3. **Pass a function to render lazily.** JSX children are created before their parent runs. Write `{() => <Heavy />}` when the content should be created only when shown, or inside a `Provider` / `ErrorBoundary` scope.
 
-### 1. `css` Tagged Template
+## Reactivity
 
-Returns a scoped class name. Supports nesting with `&`.
+```ts
+import { createSignal, createMemo, createEffect, batch, untrack, on, onCleanup } from '@velozjs/core';
 
-```tsx
-import { css } from '@veloz/css';
+const [first, setFirst] = createSignal('Ada');
+const [last, setLast] = createSignal('Lovelace');
+const full = createMemo(() => `${first()} ${last()}`); // cached, recomputes only when needed
 
-const card = css`
-  padding: 2rem;
-  border-radius: 8px;
-  
-  &:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  }
-  
-  & .title {
-    font-size: 1.5rem;
-  }
-`;
-
-<div class={card}>
-  <h2>Hello</h2>
-</div>
-```
-
-### 2. `styled` Components
-
-Creates styled Veloz components with dynamic props.
-
-```tsx
-import { styled } from '@veloz/css';
-
-const Button = styled('button')`
-  padding: 8px 16px;
-  background: ${(props) => props.primary ? '#6c63ff' : '#888'};
-  color: white;
-  border: none;
-  border-radius: 4px;
-  
-  &:hover { opacity: 0.9; }
-  &:active { transform: scale(0.97); }
-`;
-
-<Button primary onClick={handleClick}>Save</Button>
-<Button>Cancel</Button>
-```
-
-### 3. `css` Prop
-
-Inline styles as an object, automatically scoped.
-
-```tsx
-<div css={{
-  display: 'flex',
-  gap: '1rem',
-  backgroundColor: '#f0f0f0',
-  '&:hover': { background: '#e0e0e0' }
-}}>
-  Content
-</div>
-```
-
-### How It Works
-
-- CSS strings are hashed to a unique class name (e.g. `v-k7x2m`)
-- `&` is replaced with the scoped class selector
-- Styles are injected via `CSSStyleSheet` + `adoptedStyleSheets` (CSP-safe)
-- Duplicate styles are deduplicated automatically
-- `camelCase` props are converted to `kebab-case`
-- During SSR, styles are collected server-side and returned as a string for inline `<style>` injection
-- On the client after SSR, existing `<style data-veloz-css>` tags are auto-detected so styles are never duplicated or re-injected
-
-## Server-Side Rendering (`@veloz/ssr`)
-
-Veloz.js supports full server-side rendering for SEO, social sharing, and faster first paint. The SSR system collects CSS automatically during rendering, so styles are included inline in the initial HTML -- no flash of unstyled content.
-
-### Basic SSR
-
-**server.ts**
-
-```typescript
-import { renderToString } from '@veloz/ssr';
-import App from './App';
-
-app.get('*', (req, res) => {
-  const { html, css } = renderToString(() => <App url={req.url} />);
-
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style data-veloz-css>${css}</style>
-    </head>
-    <body>
-      <div id="app">${html}</div>
-      <script type="module" src="/src/entry-client.tsx"></script>
-    </body>
-    </html>
-  `);
-});
-```
-
-**entry-client.tsx**
-
-```typescript
-import { hydrate } from '@veloz/dom';
-import '@veloz/css';
-import App from './App';
-
-hydrate(() => <App />, document.getElementById('app')!);
-```
-
-### Streaming SSR
-
-```typescript
-import { renderToStream } from '@veloz/ssr';
-
-const stream = renderToStream(() => <App />);
-// Pipe to HTTP response for faster TTFB
-```
-
-### CSS in SSR
-
-All three CSS APIs (`css`, `styled`, `css` prop) work automatically during SSR. Styles are collected and returned as a string -- inject them in a `<style>` tag in your HTML shell.
-
-### How It Works
-
-1. The Vite plugin uses a `transform` hook to automatically swap the JSX runtime to `@veloz/ssr/jsx-runtime` and redirect `@veloz/dom` imports to `@veloz/ssr` during SSR (both builds and `ssrLoadModule` in dev)
-2. Components execute once (same as client) but produce HTML strings instead of DOM nodes
-3. Reactive values (signals, memos) are read once for their current value
-4. CSS generated by `css`, `styled`, and `css` prop is collected server-side and persisted across requests (Vite caches SSR modules, so CSS collection survives between renders)
-5. Hydration markers (`data-hk`) are embedded so the client can reuse existing DOM
-6. On hydration, control flow components (`Show`, `For`) skip DOM creation and reuse server-rendered elements, wiring up reactivity in place
-7. Client-side CSS automatically detects `<style data-veloz-css>` from the server, preventing flash of unstyled content (FOUC)
-
-## API Reference
-
-### Reactive Primitives
-
-```typescript
-// Create a reactive signal
-const [count, setCount] = createSignal(0);
-count();            // read: 0
-setCount(5);        // write: 5
-setCount(c => c+1); // write with function: 6
-
-// Create a computed/derived value
-const doubled = createMemo(() => count() * 2);
-doubled(); // always in sync with count
-
-// Create a reactive side effect
 createEffect(() => {
-  console.log('Count is:', count());
-  // Automatically re-runs when count changes
+  document.title = full();
+  const id = setInterval(() => {}, 1000);
+  onCleanup(() => clearInterval(id)); // runs before the next run and on dispose
 });
+
+batch(() => { setFirst('Grace'); setLast('Hopper'); }); // effects run once
+untrack(() => full());                                   // read without subscribing
+createEffect(on(first, (value, prev) => console.log(prev, '→', value), { defer: true }));
 ```
 
-### Control Flow Components
+Updates are **glitch-free**: an effect never sees a memo that is out of date, and runs once per change even when several of its sources change together. Effects created inside a component (or inside a `Show` branch, a `For` row...) are **disposed with it**.
 
-All control flow components are **hydration-aware**: during SSR hydration, `Show` and `For` reuse existing server-rendered DOM elements instead of re-creating them, wiring up reactive effects in place for a seamless transition.
+Also available: `createResource` (see [Async data](#async-data)), `createRoot(dispose => ...)` for scopes you dispose yourself, `catchError(fn, handler)`, `createContext` / `useContext`, `onMount`.
+
+## Async data
+
+`createResource` turns a promise into a signal. Wrap the part that reads it in `<Suspense>` to show a fallback while it loads, and in `<ErrorBoundary>` to handle failures.
 
 ```tsx
-// Conditional rendering
-<Show when={() => isLoggedIn()} fallback={<LoginPage />}>
-  <Dashboard />
+import { createResource, createSignal, Suspense, ErrorBoundary } from '@velozjs/dom';
+
+function Post(props: { id: () => number }) {
+  // Refetches whenever props.id() changes; stale responses are ignored.
+  const [post, { refetch }] = createResource(props.id, (id) =>
+    fetch(`/api/posts/${id}`).then((r) => r.json())
+  );
+
+  return (
+    <article>
+      <h2>{() => post()?.title}</h2>
+      <button onClick={() => refetch()} disabled={() => post.loading}>Reload</button>
+    </article>
+  );
+}
+
+function Page() {
+  const [id, setId] = createSignal(1);
+  return (
+    <ErrorBoundary fallback={(err, reset) => <p>{err.message} <button onClick={reset}>Retry</button></p>}>
+      {() => (
+        <Suspense fallback={<p>Loading...</p>}>
+          {() => <Post id={id} />}
+        </Suspense>
+      )}
+    </ErrorBoundary>
+  );
+}
+```
+
+- `post()` is the value (undefined until the first load); `post.state` is `unresolved`, `pending`, `ready`, `refreshing` or `errored`; `post.loading`, `post.error` and `post.latest` are reactive too.
+- `Suspense` shows the fallback while a resource read inside is loading **for the first time**. Refetches keep the current content on screen (use `post.loading` for a spinner). The content is created once and stays alive while hidden.
+- A failed load throws when read, so the nearest `ErrorBoundary` shows its fallback.
+- Without a source, the fetcher runs once. With a source (`createResource(source, fetcher)`), it runs again when the source changes, and not while it is `false`, `null` or `undefined`.
+- `mutate(value)` sets the value locally (optimistic updates); `refetch()` loads again.
+
+On the server, `renderToStringAsync` waits for the data (see [Server-side rendering](#server-side-rendering)), so the HTML already contains it and the client does not fetch again.
+
+## Control flow
+
+```tsx
+<Show when={() => user()} fallback={<SignIn />}>
+  {(u) => <Dashboard user={u} />}
 </Show>
 
-// List rendering
-<For each={() => todos()}>
-  {(todo) => <TodoItem todo={todo} />}
+<For each={() => todos()} fallback={<p>Nothing to do</p>}>
+  {(todo, index) => <li>{() => index() + 1}. {todo.title}</li>}
 </For>
 
-// Pattern matching
 <Switch fallback={<NotFound />}>
   <Match when={() => route() === 'home'}><Home /></Match>
   <Match when={() => route() === 'about'}><About /></Match>
 </Switch>
 
-// Render in a different DOM location
-<Portal mount={document.body}>
-  <Modal />
-</Portal>
-
-// Error handling
-<ErrorBoundary fallback={(err, reset) => <ErrorPage error={err} retry={reset} />}>
-  <App />
+<ErrorBoundary fallback={(err, reset) => <button onClick={reset}>{err.message}: retry</button>}>
+  {() => <Widget />}
 </ErrorBoundary>
+
+<Portal mount={document.body}>{() => <Modal />}</Portal>
+
+<Dynamic component={level === 1 ? 'h1' : 'h2'}>Title</Dynamic>
 ```
 
-### Lifecycle & Context
+- `For` is **keyed by item identity**: existing rows (their DOM, focus and state) are kept and moved, only new items render, removed rows are disposed.
+- `ErrorBoundary` catches errors thrown while rendering its children **and in effects they create later**.
+- `Portal` content receives events normally.
 
-```typescript
-// Run after mount
-onMount(() => {
-  console.log('Component mounted');
-});
-
-// Cleanup on unmount or re-run
-createEffect(() => {
-  const timer = setInterval(() => tick(), 1000);
-  onCleanup(() => clearInterval(timer));
-});
-
-// Context (dependency injection)
-const ThemeCtx = createContext('light');
-
-// Provider
-<ThemeCtx.Provider value="dark">
-  <App />
-</ThemeCtx.Provider>
-
-// Consumer
-const theme = useContext(ThemeCtx); // 'dark'
-```
-
-### Batching & Control
-
-```typescript
-// Batch multiple updates into one flush
-batch(() => {
-  setName('Jane');
-  setAge(25);
-  // Effects run once after batch, not twice
-});
-
-// Read signals without tracking
-const value = untrack(() => count());
-
-// Explicit dependency tracking
-createEffect(on(count, (value, prev) => {
-  console.log(`Changed from ${prev} to ${value}`);
-}, { defer: true }));
-```
-
-## Security
-
-Veloz.js is **secure by default** with 7 layers of protection:
-
-1. **Auto-escaping** - All text uses `textContent`, never `innerHTML`
-2. **HTML Sanitizer** - Built-in allowlist-based sanitizer for explicit HTML insertion
-3. **Attribute validation** - Blocks `javascript:` URLs, string event handlers
-4. **Prototype pollution protection** - `Object.create(null)` stores, key validation
-5. **CSP compatible** - Zero `eval()`, zero `new Function()`, zero inline scripts
-6. **Event delegation via Symbol** - Handlers stored internally, not as DOM attributes
-7. **Trusted Types API** - Native integration when available in browser
+## Styling
 
 ```tsx
-// Safe by default - XSS impossible
-<div>{userInput}</div>
+import { css, styled } from '@velozjs/css';
 
-// Explicit opt-in for HTML (sanitized automatically)
-import { sanitize } from '@veloz/dom';
-<div innerHTML={sanitize(rawHtml)} />
+const card = css`
+  padding: 1.5rem;
+  border-radius: 12px;
+  &:hover { box-shadow: 0 4px 12px rgb(0 0 0 / 0.1); }
+  @media (min-width: 40em) { & { padding: 2rem; } }
+`;
+
+const Button = styled('button')`
+  padding: 0.5rem 1rem;
+  background: ${(p: { tone?: string }) => (p.tone === 'danger' ? 'crimson' : 'royalblue')};
+`;
+
+<div class={card}>
+  <Button tone="danger" onClick={remove}>Delete</Button>
+  <span css={{ color: 'gray', '&:hover': { color: 'black' }, '@media (min-width: 40em)': { fontSize: '1.25rem' } }}>
+    hint
+  </span>
+</div>
 ```
 
-## Architecture
+Class names are content hashes (`v-1x2y3z`). Styles go to a constructable stylesheet (no inline `<style>` writes, CSP-friendly) and are deduplicated. Import `@velozjs/css` once in your client entry: that import enables the `css` prop.
 
+Prefer a plain stylesheet? Veloz works with any CSS, including utility or class-based libraries.
+
+## Server-side rendering
+
+```tsx
+// entry-server.tsx
+import { renderToString } from '@velozjs/ssr';
+import { App } from './App';
+
+export function render(url: string) {
+  return renderToString(() => <App url={url} />); // { html, css }
+}
 ```
-@veloz/core          - Reactive system (signals, effects, memos) - zero DOM dependency
-@veloz/dom           - DOM renderer, JSX runtime, built-in components, hydration
-@veloz/css           - CSS-in-JS module (css, styled, css prop) with auto-scoping
-@veloz/ssr           - Server-side rendering (renderToString, renderToStream, hydration)
-vite-plugin-veloz    - Vite integration for JSX transform and SSR
+
+```ts
+// server: put the result in your HTML shell
+const { html, css } = render(req.url);
+res.end(template
+  .replace('<!--ssr-css-->', `<style data-veloz-css>${css}</style>`)
+  .replace('<!--ssr-outlet-->', html));
 ```
 
-## Packages
+```tsx
+// entry-client.tsx
+import { hydrate } from '@velozjs/dom';
+import '@velozjs/css';
+import { App } from './App';
 
-| Package | Description |
-|---------|-------------|
-| `@veloz/core` | Reactive primitives (works in Node, Workers, anywhere) |
-| `@veloz/dom` | DOM rendering, JSX runtime, components, hydration |
-| `@veloz/css` | CSS-in-JS with `css`, `styled`, and `css` prop |
-| `@veloz/ssr` | Server-side rendering with CSS collection and hydration |
-| `vite-plugin-veloz` | Vite plugin for JSX transform and SSR |
+hydrate(() => <App url={location.pathname} />, document.getElementById('app')!);
+```
 
-## Contributing
+### With async data
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+`renderToString` is synchronous: resources that are still loading render their `Suspense` fallback. To send the page with the data in it, use `renderToStringAsync`:
+
+```ts
+import { renderToStringAsync } from '@velozjs/ssr';
+
+const { html, css, script } = await renderToStringAsync(() => <App url={req.url} />, { timeout: 5000 });
+res.end(template
+  .replace('<!--ssr-css-->', `<style data-veloz-css>${css}</style>`)
+  .replace('<!--ssr-outlet-->', html + script)); // the script must run before your client entry
+```
+
+It renders, waits for the pending fetches, and renders again with their values (repeating when one request depends on another). `script` hands the values to `hydrate()`, which starts every resource from them instead of fetching. Values must be JSON-serializable; failed loads are sent as their error message. Options: `timeout` (ms), `maxPasses` (default 10) and `nonce` for a CSP.
+
+Resources are matched between server and client by creation order. If a component creates resources conditionally in a way that differs between the two, give them a stable `name`: `createResource(fetcher, { name: 'user' })`.
+
+### How it fits together
+
+- With `vite-plugin-veloz`, app imports of `@velozjs/dom` resolve to `@velozjs/ssr` during SSR (dev and `vite build --ssr`), so components are shared as is.
+- The server tags elements with `data-hk` keys and wraps dynamic regions in `<!--[-->…<!--]-->` comments. `hydrate()` reuses those elements, attaches events and effects, and removes the keys.
+- Styles from `css`, `styled` and the `css` prop are collected on the server; the client detects them and does not inject them again.
+- `renderToStream()` returns a byte stream (styles first) you can pass to `new Response()`. Like `renderToString`, it does not wait for data.
+- On the server, `innerHTML` is not printed (there is no DOM sanitizer there); the client sets it, sanitized, during hydration. `Portal` content is client-only.
+
+See [`examples/ssr`](examples/ssr) for a complete dev server.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for our security policy and how to report vulnerabilities.
+- Text is always inserted as text (`createTextNode`), never parsed as HTML.
+- `innerHTML` goes through an allowlist sanitizer (with Trusted Types when available).
+- URLs in `href`, `src`, `action`, `formaction`, `srcset`... are checked after the same normalization browsers apply, so `java\tscript:` and similar tricks are blocked. `data:` is allowed only for raster images in `src`.
+- Attribute names that could break out of the tag (spaces, quotes, `=`...) are rejected, on the client and in SSR.
+- String event handlers (`onclick="..."`) are rejected; handlers are functions stored off the DOM.
+- No `eval`, `new Function` or inline scripts. Server CSS cannot close its `<style>` tag.
+
+Details in [SECURITY.md](SECURITY.md).
+
+## Without a bundler plugin
+
+`@velozjs/dom` also exports `createElement(tag, props, ...children)`, so you can use it with any JSX setup (`jsxFactory`) or without JSX.
+
+## Development
+
+```bash
+pnpm install
+pnpm test        # vitest (core, dom, css, ssr, vite-plugin)
+pnpm typecheck
+pnpm build
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Julio Carneiro

@@ -1,49 +1,86 @@
-import type { Plugin, ConfigEnv } from 'vite';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import type { Plugin } from 'vite';
 
 export interface VelozPluginOptions {
-  /** Enable HMR (default: true) */
-  hmr?: boolean;
+  /**
+   * Package names whose imports of `@velozjs/dom` are left alone during SSR.
+   * Packages named `@velozjs/*` are always excluded.
+   */
+  exclude?: string[];
 }
 
+/** During SSR, these client modules resolve to their server counterparts. */
+const SSR_REDIRECTS: Record<string, string> = {
+  '@velozjs/dom': '@velozjs/ssr',
+  '@velozjs/dom/jsx-runtime': '@velozjs/ssr/jsx-runtime',
+  '@velozjs/dom/jsx-dev-runtime': '@velozjs/ssr/jsx-dev-runtime',
+};
+
+const packageNameCache = new Map<string, string | null>();
+
+/** Name of the nearest package.json above `file` (cached per directory). */
+function packageNameOf(file: string): string | null {
+  const path = file.split('?')[0].replace(/^\0/, '');
+  let dir = dirname(path);
+  const visited: string[] = [];
+  let name: string | null = null;
+
+  for (;;) {
+    const cached = packageNameCache.get(dir);
+    if (cached !== undefined) {
+      name = cached;
+      break;
+    }
+    visited.push(dir);
+    const pkg = join(dir, 'package.json');
+    if (existsSync(pkg)) {
+      try {
+        name = (JSON.parse(readFileSync(pkg, 'utf8')) as { name?: string }).name ?? null;
+      } catch {
+        name = null;
+      }
+      break;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  for (const d of visited) packageNameCache.set(d, name);
+  return name;
+}
+
+/**
+ * Veloz for Vite: compiles JSX with the `@velozjs/dom` runtime, and during SSR
+ * (dev `ssrLoadModule` and `vite build --ssr`) resolves app imports of
+ * `@velozjs/dom` to `@velozjs/ssr`, so the same components render to HTML.
+ */
 export default function velozPlugin(options: VelozPluginOptions = {}): Plugin {
-  const { hmr: _hmr = true } = options;
+  const exclude = new Set(options.exclude ?? []);
+
+  const isFrameworkModule = (importer: string | undefined): boolean => {
+    if (!importer) return false;
+    const name = packageNameOf(importer);
+    return name != null && (name.startsWith('@velozjs/') || exclude.has(name));
+  };
 
   return {
     name: 'vite-plugin-veloz',
     enforce: 'pre',
 
-    config(_config: unknown, env: ConfigEnv) {
-      const isSSR = !!(env as unknown as Record<string, unknown>).isSsrBuild;
+    config() {
       return {
-        esbuild: {
-          jsx: 'automatic',
-          jsxImportSource: isSSR ? '@veloz/ssr' : '@veloz/dom',
-        },
-        resolve: {
-          dedupe: ['@veloz/core', '@veloz/dom', '@veloz/ssr'],
-        },
+        esbuild: { jsx: 'automatic', jsxImportSource: '@velozjs/dom' },
+        resolve: { dedupe: ['@velozjs/core', '@velozjs/dom', '@velozjs/css', '@velozjs/ssr'] },
       };
     },
 
-    transform(code, id, transformOptions) {
-      if (!transformOptions?.ssr) return;
-      if (!/\.[jt]sx?(\?|$)/.test(id)) return;
-
-      let result = code;
-
-      if (/\.[jt]sx(\?|$)/.test(id)) {
-        result = `/* @jsxImportSource @veloz/ssr */\n${result}`;
-      }
-
-      const isFramework = /[/\\]packages[/\\]/.test(id) || id.includes('node_modules/@veloz/');
-      if (!isFramework) {
-        result = result.replaceAll("from '@veloz/dom'", "from '@veloz/ssr'");
-        result = result.replaceAll('from "@veloz/dom"', 'from "@veloz/ssr"');
-      }
-
-      if (result !== code) {
-        return { code: result, map: null };
-      }
+    async resolveId(source, importer, resolveOptions) {
+      if (!resolveOptions?.ssr) return null;
+      const target = SSR_REDIRECTS[source];
+      if (!target || isFrameworkModule(importer)) return null;
+      return this.resolve(target, importer, { ...resolveOptions, skipSelf: true });
     },
   };
 }

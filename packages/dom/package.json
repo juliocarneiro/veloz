@@ -1,37 +1,65 @@
 {
-  "name": "@veloz/dom",
+  "name": "@velozjs/dom",
   "version": "0.1.0",
-  "description": "Veloz.js DOM renderer - JSX runtime, components, rendering",
+  "description": "Veloz DOM renderer: JSX runtime, control flow, hydration and built-in XSS protection.",
+  "keywords": [
+    "veloz",
+    "velozjs",
+    "signals",
+    "reactive",
+    "fine-grained",
+    "jsx",
+    "dom",
+    "renderer",
+    "hydration",
+    "framework"
+  ],
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "default": "./dist/index.js"
     },
     "./jsx-runtime": {
       "types": "./dist/jsx-runtime.d.ts",
-      "import": "./dist/jsx-runtime.js",
-      "require": "./dist/jsx-runtime.cjs"
+      "default": "./dist/jsx-runtime.js"
     },
     "./jsx-dev-runtime": {
       "types": "./dist/jsx-dev-runtime.d.ts",
-      "import": "./dist/jsx-dev-runtime.js",
-      "require": "./dist/jsx-dev-runtime.cjs"
-    }
+      "default": "./dist/jsx-dev-runtime.js"
+    },
+    "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "prebuild": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsup",
-    "clean": "rm -rf dist"
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@veloz/core": "workspace:*"
+    "@velozjs/core": "workspace:^"
   },
-  "sideEffects": false,
-  "license": "MIT"
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Julio Carneiro (https://juliocarneiro.dev)",
+  "license": "MIT",
+  "homepage": "https://github.com/juliocarneiro/veloz#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juliocarneiro/veloz.git",
+    "directory": "packages/dom"
+  },
+  "bugs": {
+    "url": "https://github.com/juliocarneiro/veloz/issues"
+  }
 }

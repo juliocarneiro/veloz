@@ -1,27 +1,24 @@
-const DANGEROUS_URL_SCHEMES = /^(javascript|data|vbscript):/i;
+import { URL_ATTRIBUTES, isSafeAttributeURL, isSafeURL, isValidAttributeName } from '@velozjs/core';
 
-const URL_ATTRIBUTES = new Set([
-  'href', 'src', 'action', 'formaction', 'poster', 'srcset',
-  'background', 'cite', 'codebase', 'longdesc',
-]);
+function warn(message: string): void {
+  if (typeof console !== 'undefined') console.warn(`[Veloz Security] ${message}`);
+}
 
+/** Returns false (and warns) for attributes that must not be set as given. */
 export function validateAttribute(name: string, value: unknown): boolean {
-  if (name.startsWith('on') && typeof value === 'string') {
-    if (typeof console !== 'undefined') {
-      console.warn(
-        `[Veloz Security] Blocked string event handler "${name}". Use a function instead.`
-      );
-    }
+  if (!isValidAttributeName(name)) {
+    warn(`Blocked invalid attribute name "${name}".`);
+    return false;
+  }
+
+  if (/^on/i.test(name) && typeof value === 'string') {
+    warn(`Blocked string event handler "${name}". Use a function instead.`);
     return false;
   }
 
   if (URL_ATTRIBUTES.has(name.toLowerCase()) && typeof value === 'string') {
-    if (DANGEROUS_URL_SCHEMES.test(value.trim())) {
-      if (typeof console !== 'undefined') {
-        console.warn(
-          `[Veloz Security] Blocked dangerous URL in "${name}": ${value}`
-        );
-      }
+    if (!isSafeAttributeURL(name, value)) {
+      warn(`Blocked dangerous URL in "${name}".`);
       return false;
     }
   }
@@ -29,12 +26,9 @@ export function validateAttribute(name: string, value: unknown): boolean {
   return true;
 }
 
+/** Returns the URL trimmed, or `about:blank` if it could run script. */
 export function sanitizeURL(url: string): string {
-  const trimmed = url.trim();
-  if (DANGEROUS_URL_SCHEMES.test(trimmed)) {
-    return 'about:blank';
-  }
-  return trimmed;
+  return isSafeURL(url) ? url.trim() : 'about:blank';
 }
 
 export function isExternalURL(url: string): boolean {

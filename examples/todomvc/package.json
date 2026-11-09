@@ -9,13 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@veloz/core": "workspace:*",
-    "@veloz/dom": "workspace:*",
-    "@veloz/css": "workspace:*"
+    "@velozjs/core": "workspace:^",
+    "@velozjs/dom": "workspace:^",
+    "@velozjs/css": "workspace:^"
   },
   "devDependencies": {
-    "vite": "^6.0.0",
-    "vite-plugin-veloz": "workspace:*",
+    "vite": "^7.0.0",
+    "vite-plugin-veloz": "workspace:^",
     "typescript": "^5.7.0"
   }
 }

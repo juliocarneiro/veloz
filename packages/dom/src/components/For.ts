@@ -1,115 +1,98 @@
-import { createEffect, createSignal } from '@veloz/core';
-import { isHydrating } from '../hydration-state.js';
+import {
+  createMemo,
+  createRoot,
+  createSignal,
+  onCleanup,
+  untrack,
+  access,
+  type Getter,
+  type MaybeAccessor,
+  type Setter,
+} from '@velozjs/core';
+import { insertChild, nodesBetween } from '../insert.js';
 import type { VelozNode } from '../types.js';
 
 export interface ForProps<T> {
-  each: T[] | (() => T[]);
-  fallback?: VelozNode;
-  children: (item: T, index: () => number) => VelozNode;
+  each: MaybeAccessor<readonly T[] | undefined | null | false>;
+  fallback?: unknown;
+  /** Called once per item; `index` updates when the item moves. */
+  children: (item: T, index: Getter<number>) => VelozNode | unknown;
 }
 
-export function For<T>(props: ForProps<T>): Node {
-  if (isHydrating()) {
-    return hydrateFor(props);
-  }
+interface Row<T> {
+  item: T;
+  start: Node;
+  end: Node;
+  setIndex: Setter<number>;
+  dispose: () => void;
+}
 
-  const startMarker = document.createComment('For');
-  const endMarker = document.createComment('/For');
-  const frag = document.createDocumentFragment();
-  frag.appendChild(startMarker);
-  frag.appendChild(endMarker);
+/**
+ * Keyed list: rows are matched by item identity, so existing rows (their DOM,
+ * focus and state) are kept and only moved, added or removed.
+ */
+export function For<T>(props: ForProps<T>): () => unknown {
+  let rows: Row<T>[] = [];
 
-  let currentMappings: { item: T; nodes: Node[]; indexSignal: ReturnType<typeof createSignal<number>> }[] = [];
-  let initialized = false;
-
-  createEffect(() => {
-    const raw = props.each;
-    const items = (typeof raw === 'function' ? (raw as () => T[])() : raw) ?? [];
-    const parent = startMarker.parentNode;
-
-    if (parent) {
-      for (const m of currentMappings) {
-        for (const node of m.nodes) {
-          parent.removeChild(node);
-        }
-      }
-    }
-
-    if (items.length === 0) {
-      currentMappings = [];
-      if (props.fallback != null) {
-        const nodes = toNodes(props.fallback);
-        const dummyIndex = createSignal(0);
-        currentMappings = [{ item: undefined as any, nodes, indexSignal: dummyIndex }];
-        insertNodes(nodes, parent, endMarker, frag, initialized);
-      }
-      initialized = true;
-      return;
-    }
-
-    const newMappings: typeof currentMappings = [];
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const indexSignal = createSignal(i);
-      const [getIndex] = indexSignal;
-      const content = props.children(item, getIndex);
-      const nodes = toNodes(content);
-      newMappings.push({ item, nodes, indexSignal });
-    }
-
-    for (const mapping of newMappings) {
-      insertNodes(mapping.nodes, parent, endMarker, frag, initialized);
-    }
-
-    currentMappings = newMappings;
-    initialized = true;
+  onCleanup(() => {
+    for (const row of rows) row.dispose();
+    rows = [];
   });
 
-  return frag;
-}
+  const mapped = createMemo(
+    () => {
+      const items = access(props.each) || [];
+      return untrack(() => {
+        // Reuse rows by identity; duplicates are matched in order.
+        const pool = new Map<T, Row<T>[]>();
+        for (const row of rows) {
+          const list = pool.get(row.item);
+          if (list) list.push(row);
+          else pool.set(row.item, [row]);
+        }
 
-function hydrateFor<T>(props: ForProps<T>): Node {
-  const raw = props.each;
-  const items = (typeof raw === 'function' ? (raw as () => T[])() : raw) ?? [];
+        const next: Row<T>[] = new Array(items.length);
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const reused = pool.get(item)?.shift();
+          if (reused) {
+            reused.setIndex(i);
+            next[i] = reused;
+          } else {
+            next[i] = createRow(item, i, props.children);
+          }
+        }
 
-  for (let i = 0; i < items.length; i++) {
-    const indexSignal = createSignal(i);
-    const [getIndex] = indexSignal;
-    props.children(items[i], getIndex);
-  }
+        for (const list of pool.values()) for (const row of list) row.dispose();
+        rows = next;
+        return next;
+      });
+    },
+    undefined,
+    { equals: false }
+  );
 
-  return document.createTextNode('');
-}
-
-function insertNodes(
-  nodes: Node[],
-  parent: Node | null,
-  endMarker: Node,
-  frag: DocumentFragment,
-  initialized: boolean
-): void {
-  if (parent) {
-    for (const node of nodes) {
-      parent.insertBefore(node, endMarker);
-    }
-  } else if (!initialized) {
-    for (const node of nodes) {
-      frag.insertBefore(node, endMarker);
-    }
-  }
-}
-
-function toNodes(content: unknown): Node[] {
-  if (content instanceof DocumentFragment) {
-    return Array.from(content.childNodes);
-  }
-  if (content instanceof Node) return [content];
-  if (Array.isArray(content)) {
+  return () => {
+    const list = mapped();
+    if (list.length === 0) return props.fallback ?? null;
     const nodes: Node[] = [];
-    for (const item of content) nodes.push(...toNodes(item));
+    for (const row of list) nodes.push(...nodesBetween(row.start, row.end));
     return nodes;
-  }
-  if (content == null || typeof content === 'boolean') return [];
-  return [document.createTextNode(String(content))];
+  };
+}
+
+function createRow<T>(
+  item: T,
+  index: number,
+  render: (item: T, index: Getter<number>) => unknown
+): Row<T> {
+  return createRoot((dispose) => {
+    const [getIndex, setIndex] = createSignal(index);
+    // Markers delimit the row, so content that grows later moves with it.
+    const frag = document.createDocumentFragment();
+    const start = frag.appendChild(document.createTextNode(''));
+    insertChild(frag, render(item, getIndex));
+    const end = frag.appendChild(document.createTextNode(''));
+    return { item, start, end, setIndex, dispose };
+  });
 }
