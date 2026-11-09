@@ -18,7 +18,7 @@ export type {
   SuspenseProps,
 } from './components/index.js';
 
-export type { VelozNode, VelozChild, VelozComponent, VelozElement } from './types.js';
+export type { VelozNode, VelozChild, VelozComponent, VelozElement, StaticElement, DOMAttributes, EventHandler, TargetedEvent, Ref } from './types.js';
 export type { JSX } from './types.js';
 
 // Re-export the reactive core so apps can import everything from one place.

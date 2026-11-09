@@ -8,7 +8,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p type-tests",
     "clean": "pnpm -r run clean",
     "release": "pnpm typecheck && pnpm test && pnpm build && pnpm --filter \"./packages/*\" publish --access public"
   },

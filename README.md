@@ -41,6 +41,8 @@ export default defineConfig({ plugins: [veloz()] });
 { "jsx": "react-jsx", "jsxImportSource": "@velozjs/dom" }
 ```
 
+Requirements: Node 20+, Vite 5 or newer (Vite 8 included), TypeScript 5.1+ if you use TypeScript.
+
 ```tsx
 // src/main.tsx
 import { render, createSignal, createMemo, Show } from '@velozjs/dom';
@@ -187,7 +189,8 @@ const card = css`
   padding: 1.5rem;
   border-radius: 12px;
   &:hover { box-shadow: 0 4px 12px rgb(0 0 0 / 0.1); }
-  @media (min-width: 40em) { & { padding: 2rem; } }
+  .title { font-weight: 600; }          /* descendant: .v-xyz .title */
+  @media (min-width: 40em) { padding: 2rem; }
 `;
 
 const Button = styled('button')`
@@ -202,6 +205,8 @@ const Button = styled('button')`
   </span>
 </div>
 ```
+
+Nested rules are always scoped: `&` marks where the class goes, and a rule without `&` applies to descendants. `@media`, `@supports` and `@container` scope their contents; `@keyframes` and `@font-face` are kept as written. In style objects (`style`, `css`), numbers get `px` except for unitless properties such as `opacity`, `zIndex` and `lineHeight`.
 
 Class names are content hashes (`v-1x2y3z`). Styles go to a constructable stylesheet (no inline `<style>` writes, CSP-friendly) and are deduplicated. Import `@velozjs/css` once in your client entry: that import enables the `css` prop.
 
@@ -259,6 +264,7 @@ Resources are matched between server and client by creation order. If a componen
 - The server tags elements with `data-hk` keys and wraps dynamic regions in `<!--[-->…<!--]-->` comments. `hydrate()` reuses those elements, attaches events and effects, and removes the keys.
 - Styles from `css`, `styled` and the `css` prop are collected on the server; the client detects them and does not inject them again.
 - `renderToStream()` returns a byte stream (styles first) you can pass to `new Response()`. Like `renderToString`, it does not wait for data.
+- `createEffect` and `onMount` don't run on the server (they're for browser side effects), so code inside them can use `window` and `document` freely. Memos and resources do run.
 - On the server, `innerHTML` is not printed (there is no DOM sanitizer there); the client sets it, sanitized, during hydration. `Portal` content is client-only.
 
 See [`examples/ssr`](examples/ssr) for a complete dev server.

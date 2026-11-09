@@ -22,6 +22,9 @@ const SVG_TAGS = new Set([
   'textPath', 'tspan', 'use', 'view',
 ]);
 
+const FORM_ELEMENTS = new Set(['input', 'select', 'textarea', 'option']);
+const FORM_STATE_PROPS = new Set(['value', 'checked', 'selected', 'indeterminate', 'selectedIndex']);
+
 let cssPropHandler: ((obj: Record<string, unknown>) => string) | null = null;
 
 export function registerCssPropHandler(handler: (obj: Record<string, unknown>) => string): void {
@@ -62,8 +65,24 @@ function createHTMLElement(tag: string, props: Record<string, unknown>, children
 
   let cssClass = props.css && cssPropHandler ? cssPropHandler(props.css as Record<string, unknown>) : '';
 
+  // Form state goes last: a <select>'s value needs its <option>s, and an
+  // <input>'s value needs its type/min/max/step first.
+  const deferred: string[] = [];
+  const applyKey = (key: string) => {
+    const value = props[key];
+    if (typeof value === 'function' && key !== 'ref' && !eventNameFromProp(key)) {
+      applyReactiveProp(el, key, value as () => unknown, isSVG);
+    } else {
+      applyProp(el, key, value, isSVG);
+    }
+  };
+
   for (const key of Object.keys(props)) {
     if (key === 'children' || key === 'css' || key === 'key') continue;
+    if (FORM_STATE_PROPS.has(key) && FORM_ELEMENTS.has(tag)) {
+      deferred.push(key);
+      continue;
+    }
     const value = props[key];
 
     if ((key === 'class' || key === 'className') && cssClass) {
@@ -77,11 +96,7 @@ function createHTMLElement(tag: string, props: Record<string, unknown>, children
       continue;
     }
 
-    if (typeof value === 'function' && key !== 'ref' && !eventNameFromProp(key)) {
-      applyReactiveProp(el, key, value as () => unknown, isSVG);
-    } else {
-      applyProp(el, key, value, isSVG);
-    }
+    applyKey(key);
   }
 
   if (cssClass) el.classList.add(cssClass);
@@ -90,6 +105,8 @@ function createHTMLElement(tag: string, props: Record<string, unknown>, children
     if (claimed) for (const child of children) hydrateChild(el, child);
     else for (const child of children) insertChild(el, child);
   }
+
+  for (const key of deferred) applyKey(key);
 
   return el;
 }

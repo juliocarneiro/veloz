@@ -3,12 +3,13 @@ import {
   setCurrentOwner,
   disposeOwner,
   resetResourceKeys,
+  restoreResourceKeys,
   setResourceData,
   setResourcePendingHandler,
   type ResourceEntry,
 } from '@velozjs/core';
 import { getSSRStyles } from '@velozjs/css';
-import { resetHydrationCounter } from './hydration.js';
+import { resetHydrationCounter, restoreHydrationCounter } from './hydration.js';
 import { renderChildren } from './jsx-runtime.js';
 
 export interface SSRResult {
@@ -37,9 +38,14 @@ export interface AsyncRenderOptions {
   nonce?: string;
 }
 
+/**
+ * One synchronous render. Keys restart at 0 and are restored afterwards, so a
+ * render nested inside another (e.g. an island rendered as its own root)
+ * leaves the outer one intact.
+ */
 function renderPass(fn: () => unknown): string {
-  resetHydrationCounter();
-  resetResourceKeys();
+  const hydrationKey = resetHydrationCounter();
+  const resourceKey = resetResourceKeys();
   const owner = createOwner();
   const prev = setCurrentOwner(owner);
   try {
@@ -47,6 +53,8 @@ function renderPass(fn: () => unknown): string {
   } finally {
     setCurrentOwner(prev);
     disposeOwner(owner);
+    restoreHydrationCounter(hydrationKey);
+    restoreResourceKeys(resourceKey);
   }
 }
 

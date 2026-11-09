@@ -41,6 +41,8 @@ export default defineConfig({ plugins: [veloz()] });
 { "jsx": "react-jsx", "jsxImportSource": "@velozjs/dom" }
 ```
 
+Requisitos: Node 20+, Vite 5 ou mais novo (inclusive o Vite 8), TypeScript 5.1+ se você usa TypeScript.
+
 ```tsx
 // src/main.tsx
 import { render, createSignal, createMemo, Show } from '@velozjs/dom';
@@ -187,7 +189,8 @@ const card = css`
   padding: 1.5rem;
   border-radius: 12px;
   &:hover { box-shadow: 0 4px 12px rgb(0 0 0 / 0.1); }
-  @media (min-width: 40em) { & { padding: 2rem; } }
+  .title { font-weight: 600; }          /* descendente: .v-xyz .title */
+  @media (min-width: 40em) { padding: 2rem; }
 `;
 
 const Button = styled('button')`
@@ -202,6 +205,8 @@ const Button = styled('button')`
   </span>
 </div>
 ```
+
+Regras aninhadas sempre ficam com escopo: `&` indica onde entra a classe, e uma regra sem `&` vale para os descendentes. `@media`, `@supports` e `@container` aplicam o escopo ao conteúdo; `@keyframes` e `@font-face` ficam como foram escritos. Em objetos de estilo (`style`, `css`), números ganham `px`, menos nas propriedades sem unidade, como `opacity`, `zIndex` e `lineHeight`.
 
 Os nomes de classe são hashes do conteúdo (`v-1x2y3z`). Os estilos vão para uma folha de estilo construída via JS (sem escrever `<style>` inline, compatível com CSP) e não se repetem. Importe `@velozjs/css` uma vez na entrada do cliente: é esse import que ativa a prop `css`.
 
@@ -259,6 +264,7 @@ Os recursos são associados entre servidor e cliente pela ordem de criação. Se
 - O servidor marca os elementos com chaves `data-hk` e envolve as regiões dinâmicas em comentários `<!--[-->…<!--]-->`. O `hydrate()` reaproveita esses elementos, liga eventos e effects e remove as chaves.
 - Os estilos de `css`, `styled` e da prop `css` são coletados no servidor; o cliente os detecta e não os injeta de novo.
 - `renderToStream()` devolve um stream de bytes (estilos primeiro) que você passa para `new Response()`. Assim como o `renderToString`, não espera dados.
+- `createEffect` e `onMount` não rodam no servidor (servem para efeitos no navegador), então o código dentro deles pode usar `window` e `document` à vontade. Memos e recursos rodam.
 - No servidor, `innerHTML` não é impresso (lá não há sanitizador de DOM); o cliente o define, sanitizado, durante a hidratação. O conteúdo de `Portal` só existe no cliente.
 
 Veja [`examples/ssr`](examples/ssr) para um servidor de desenvolvimento completo.

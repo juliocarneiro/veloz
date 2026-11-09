@@ -1,4 +1,4 @@
-import { createRenderEffect, isValidAttributeName } from '@velozjs/core';
+import { createRenderEffect, isValidAttributeName, toCSSProperty, toCSSValue } from '@velozjs/core';
 import { validateAttribute } from './security.js';
 import { setEventHandler } from './events.js';
 import { sanitize } from './sanitizer.js';
@@ -91,9 +91,6 @@ function setRef<T>(el: T, ref: Ref<T> | null | undefined): void {
   else if (ref && typeof ref === 'object') ref.current = el;
 }
 
-function toKebab(prop: string): string {
-  return prop.startsWith('--') ? prop : prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-}
 
 function applyStyle(el: HTMLElement, value: unknown): void {
   const previous = prevStyles.get(el);
@@ -105,9 +102,9 @@ function applyStyle(el: HTMLElement, value: unknown): void {
   if (value && typeof value === 'object') {
     const next = new Set<string>();
     for (const [prop, v] of Object.entries(value as Record<string, unknown>)) {
-      const key = toKebab(prop);
+      const key = toCSSProperty(prop);
       if (v == null || v === false) continue;
-      el.style.setProperty(key, String(v));
+      el.style.setProperty(key, toCSSValue(key, v));
       next.add(key);
     }
     // Remove properties that were set last time but are gone now.

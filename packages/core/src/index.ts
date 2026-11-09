@@ -2,7 +2,7 @@ export { createSignal, batch, untrack, on } from './signal.js';
 export type { OnOptions } from './signal.js';
 export { createEffect, createRenderEffect, createComputation } from './effect.js';
 export { createMemo } from './memo.js';
-export { access } from './utils.js';
+export { access, toCSSProperty, toCSSValue } from './utils.js';
 export type { MaybeAccessor } from './utils.js';
 export { onMount, onCleanup } from './lifecycle.js';
 export { createContext, useContext } from './context.js';
@@ -42,6 +42,7 @@ export {
   setResourceData,
   setResourcePendingHandler,
   resetResourceKeys,
+  restoreResourceKeys,
 } from './resource.js';
 export type {
   Resource,

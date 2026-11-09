@@ -8,6 +8,8 @@ import {
   isSafeAttributeURL,
   isValidAttributeName,
   isValidTagName,
+  toCSSProperty,
+  toCSSValue,
 } from '@velozjs/core';
 import { processCssProp } from '@velozjs/css';
 import { escapeHTML, escapeAttr } from './escape.js';
@@ -28,8 +30,8 @@ const ATTRIBUTE_ALIASES: Record<string, string> = { htmlFor: 'for', className: '
 export const REGION_START = '<!--[-->';
 export const REGION_END = '<!--]-->';
 
-const RAW_HTML = Symbol('veloz_raw_html');
-const DEFERRED = Symbol('veloz_deferred');
+const RAW_HTML = Symbol.for('veloz.raw-html');
+const DEFERRED = Symbol.for('veloz.deferred');
 const MATCH = Symbol.for('veloz.match');
 
 /**
@@ -200,8 +202,8 @@ function resolveStyle(value: unknown): string {
     return Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v != null && v !== false)
       .map(([prop, v]) => {
-        const key = prop.startsWith('--') ? prop : prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-        return `${key}:${v}`;
+        const key = toCSSProperty(prop);
+        return `${key}:${toCSSValue(key, v)}`;
       })
       .join(';');
   }

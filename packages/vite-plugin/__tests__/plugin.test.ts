@@ -26,9 +26,14 @@ async function resolve(source: string, importer: string, ssr: boolean) {
 describe('vite-plugin-veloz', () => {
   const { appFile, libFile } = fixture();
 
-  it('compiles JSX with the @velozjs/dom runtime', () => {
+  it('compiles JSX with the @velozjs/dom runtime (esbuild before Vite 8)', () => {
     const config = (velozPlugin() as any).config();
     expect(config.esbuild).toMatchObject({ jsx: 'automatic', jsxImportSource: '@velozjs/dom' });
+  });
+
+  it('keeps @velozjs/dom and @velozjs/ssr out of SSR externals so imports can be redirected', () => {
+    const config = (velozPlugin() as any).config();
+    expect(config.ssr.noExternal).toEqual(expect.arrayContaining(['@velozjs/dom', '@velozjs/ssr']));
   });
 
   it('redirects app imports to @velozjs/ssr during SSR, even inside a monorepo packages/ folder', async () => {
