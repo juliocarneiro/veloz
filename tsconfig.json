@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"]
+}

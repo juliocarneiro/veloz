@@ -1,80 +1,34 @@
-import type { Computation, SignalNode, Getter } from './types.js';
+import type { Computation, SignalNode, Getter, SignalOptions } from './types.js';
 import { ComputationState } from './types.js';
-import {
-  createOwner,
-  setCurrentObserver,
-  setCurrentOwner,
-  cleanupComputation,
-  trackRead,
-  notifyObservers,
-  incrementClock,
-} from './reactive.js';
+import { createComputationNode, runComputation, trackRead, updateIfNecessary } from './reactive.js';
 
+/**
+ * Derived, cached value. Recomputes only when its sources change, and only
+ * notifies dependents when the result is different (per `equals`).
+ */
 export function createMemo<T>(
-  fn: (prev?: T) => T,
+  fn: (prev: T | undefined) => T,
   initialValue?: T,
-  options?: { equals?: false | ((a: T, b: T) => boolean) }
+  options?: SignalOptions<T>
 ): Getter<T> {
-  const equals = options?.equals ?? defaultEquals;
-
+  const comp = createComputationNode(fn, initialValue);
   const node: SignalNode<T> = {
     value: initialValue as T,
-    observers: [],
-    observerSlots: [],
-    equals: equals,
+    observers: new Set(),
+    equals: options?.equals ?? Object.is,
+    comp,
   };
+  comp.node = node;
 
-  const comp: Computation = {
-    ...createOwner(),
-    fn: null,
-    sources: [],
-    sourceSlots: [],
-    state: ComputationState.Dirty,
-    updatedAt: 0,
-  };
-
-  comp.fn = () => {
-    const prevObserver = setCurrentObserver(comp);
-    const prevOwner = setCurrentOwner(comp);
-    cleanupComputation(comp);
-    comp.state = ComputationState.Clean;
-    comp.updatedAt = incrementClock();
-
-    try {
-      const newValue = fn(node.value);
-      if (equals === false || !equals(node.value, newValue)) {
-        node.value = newValue;
-        notifyObservers(node);
-      }
-    } finally {
-      setCurrentObserver(prevObserver);
-      setCurrentOwner(prevOwner);
-    }
-    return undefined;
-  };
-
-  // Run initially to establish dependencies
-  const prevObserver = setCurrentObserver(comp);
-  const prevOwner = setCurrentOwner(comp);
-  comp.state = ComputationState.Clean;
-  comp.updatedAt = incrementClock();
-
-  try {
-    node.value = fn(initialValue);
-  } finally {
-    setCurrentObserver(prevObserver);
-    setCurrentOwner(prevOwner);
-  }
+  // First run: compute the value without notifying anyone.
+  const equals = node.equals;
+  node.equals = false;
+  runComputation(comp as Computation);
+  node.equals = equals;
 
   return () => {
-    if (comp.state !== ComputationState.Clean) {
-      comp.fn!(undefined);
-    }
+    if (comp.state !== ComputationState.Clean) updateIfNecessary(comp as Computation);
     trackRead(node);
     return node.value;
   };
-}
-
-function defaultEquals<T>(a: T, b: T): boolean {
-  return Object.is(a, b);
 }

@@ -1,69 +1,42 @@
-import { createSignal, createOwner, setCurrentOwner } from '@veloz/core';
-import { insertChild } from '../jsx-runtime.js';
+import { createSignal, catchError, untrack } from '@velozjs/core';
+import { toNodes } from '../jsx-runtime.js';
 import type { VelozNode } from '../types.js';
 
 export interface ErrorBoundaryProps {
-  fallback: (error: Error, reset: () => void) => VelozNode;
-  children?: VelozNode;
+  fallback: VelozNode | ((error: Error, reset: () => void) => VelozNode);
+  /**
+   * Pass a function (`{() => <App />}`) so rendering happens inside the
+   * boundary; JSX children written directly are created before it runs.
+   */
+  children?: unknown;
 }
 
-export function ErrorBoundary(props: ErrorBoundaryProps): Node {
-  const [error, setError] = createSignal<Error | null>(null);
-  const container = document.createDocumentFragment();
-  const marker = document.createComment('ErrorBoundary');
-  container.appendChild(marker);
+function toError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
 
-  const reset = () => {
-    setError(null);
-    tryRenderChildren();
+/**
+ * Catches errors thrown while rendering its children and in any effect they
+ * create later, and shows `fallback`. `reset()` renders the children again.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps): () => unknown {
+  const [failure, setFailure] = createSignal<{ error: Error } | null>(null);
+  const reset = () => setFailure(null);
+
+  return () => {
+    const f = failure();
+    if (f) {
+      const fallback = props.fallback;
+      return typeof fallback === 'function' ? untrack(() => fallback(f.error, reset)) : fallback;
+    }
+    // Resolve the children to nodes inside the boundary, so the effects they
+    // create are owned by it and their errors land here.
+    return catchError(
+      () => {
+        const children = props.children;
+        return toNodes(typeof children === 'function' ? (children as () => unknown)() : children);
+      },
+      (err) => setFailure({ error: toError(err) })
+    );
   };
-
-  function tryRenderChildren(): void {
-    const parent = marker.parentNode;
-    if (!parent) {
-      try {
-        const result = renderChildren();
-        container.appendChild(result);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-        const fallbackResult = props.fallback(error()!, reset);
-        if (fallbackResult instanceof Node) {
-          container.appendChild(fallbackResult);
-        }
-      }
-      return;
-    }
-
-    clearSiblings(marker);
-    try {
-      const result = renderChildren();
-      if (result instanceof Node) {
-        parent.insertBefore(result, marker);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      const fallbackResult = props.fallback(error()!, reset);
-      if (fallbackResult instanceof Node) {
-        parent.insertBefore(fallbackResult, marker);
-      }
-    }
-  }
-
-  function renderChildren(): Node {
-    const frag = document.createDocumentFragment();
-    insertChild(frag, props.children);
-    return frag;
-  }
-
-  tryRenderChildren();
-
-  return container.childNodes.length === 1 ? container.childNodes[0] : marker;
-}
-
-function clearSiblings(marker: Node): void {
-  const parent = marker.parentNode;
-  if (!parent) return;
-  while (parent.firstChild && parent.firstChild !== marker) {
-    parent.removeChild(parent.firstChild);
-  }
 }

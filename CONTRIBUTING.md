@@ -1,96 +1,60 @@
-# Contributing to Veloz.js
+# Contributing to Veloz
 
-Thank you for your interest in contributing to Veloz.js! This document provides guidelines and instructions for contributing.
+Thanks for helping. Bug reports, docs fixes and pull requests are all welcome.
 
-## Development Setup
+## Setup
+
+Requirements: Node.js 20+ and pnpm 10+ (the repo pins the version in `packageManager`; `corepack enable` picks it up).
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/veloz.git
+git clone https://github.com/juliocarneiro/veloz.git
 cd veloz
-
-# Install dependencies (requires pnpm >= 9)
 pnpm install
-
-# Run tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Build all packages
+pnpm test        # all packages, against the sources
+pnpm typecheck
 pnpm build
 ```
 
-## Project Structure
+Tests run against `packages/*/src` through Vitest aliases, so you don't need to build first.
+
+## Layout
 
 ```
 packages/
-  core/        - Reactive system (signals, effects, memos)
-  dom/         - DOM renderer, JSX runtime, components, hydration
-  css/         - CSS-in-JS with auto-scoping
-  ssr/         - Server-side rendering and hydration
-  vite-plugin/ - Vite integration and SSR config
+  core/         signals, memos, effects, ownership, context (no DOM)
+  dom/          JSX runtime, render, hydrate, control flow, events, sanitizer
+  css/          css``, styled(), css prop, SSR style collection
+  ssr/          renderToString, renderToStream, server components
+  vite-plugin/  JSX config + SSR module resolution
 examples/
-  counter/     - Basic counter example
-  todomvc/     - TodoMVC example
-  ssr/         - SSR with hydration example
+  todomvc/      client-only app
+  ssr/          dev server with SSR + hydration
 ```
 
-## Development Workflow
+Run an example with `pnpm --dir examples/todomvc dev` or `pnpm --dir examples/ssr dev` (they use the built packages, so run `pnpm build` first).
 
-1. **Fork** the repository
-2. **Create a branch** from `main` for your feature or fix
-3. **Write tests** for any new functionality
-4. **Run the test suite** to ensure nothing is broken: `pnpm test`
-5. **Submit a pull request** with a clear description of the changes
+## Pull requests
 
-## Guidelines
+1. Branch from `main`.
+2. Add a test that fails without your change. Bugs in rendering or hydration usually belong in `packages/dom/__tests__/regressions.test.tsx` or `ssr-hydration.test.ts`.
+3. `pnpm typecheck && pnpm test && pnpm build` must pass.
+4. Describe the user-facing change; add a line to `CHANGELOG.md` under "Unreleased".
 
-### Code Style
+### Guidelines
 
-- TypeScript strict mode is enforced
-- Use functional patterns over class-based
-- Keep functions small and focused
-- No comments that just narrate what the code does
+- TypeScript strict, small functions, comments that explain *why*.
+- Keep server and client in step: anything the client renders as a reactive region must be wrapped in region markers by `@velozjs/ssr`, and elements must be created in the same order on both sides (the end-to-end test in `ssr-hydration.test.ts` checks this).
+- Security tests are never removed or weakened.
+- No `eval`, `new Function`, `document.write`, or `innerHTML` without `sanitize()`.
 
-### Testing
+## Releasing (maintainers)
 
-- Write unit tests for reactive primitives in `packages/core/__tests__/`
-- Write integration tests for DOM operations in `packages/dom/__tests__/`
-- Write SSR tests in `packages/ssr/__tests__/` (run in Node.js, no jsdom needed)
-- CSS collection and hydration tests live in `packages/ssr/__tests__/css-collection.test.ts`
-- Hydration-aware control flow (`Show`, `For`) is covered in `packages/dom/__tests__/`
-- Security tests are critical - never remove them
+```bash
+pnpm release   # typecheck, test, build, then pnpm publish for every package
+```
 
-### Commits
-
-- Use clear, descriptive commit messages
-- Reference issue numbers when applicable
-- Keep commits focused on a single change
-
-### Security
-
-- Never use `eval()`, `new Function()`, or `document.write()`
-- Never use `innerHTML` without the sanitizer
-- Always use `textContent` or `createTextNode` for user-provided text
-- Run security tests before submitting: `pnpm test`
-
-## Reporting Bugs
-
-Open an issue with:
-- A clear description of the bug
-- Steps to reproduce
-- Expected vs actual behavior
-- Browser and OS information
-
-## Requesting Features
-
-Open an issue with:
-- A clear description of the feature
-- Use cases and motivation
-- API design proposal (if applicable)
+Use `pnpm publish` (not `npm publish`): it replaces the `workspace:^` ranges with real versions.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing you agree that your contributions are licensed under the MIT License.

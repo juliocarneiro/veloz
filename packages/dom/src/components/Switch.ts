@@ -1,75 +1,64 @@
-import { createEffect } from '@veloz/core';
+import { createMemo, access, type MaybeAccessor } from '@velozjs/core';
 import type { VelozNode } from '../types.js';
 
+const MATCH = Symbol.for('veloz.match');
+
 export interface MatchProps<T> {
-  when: T | undefined | null | false;
-  children: VelozNode | ((value: T) => VelozNode);
+  when: MaybeAccessor<T | undefined | null | false>;
+  children?: unknown | ((value: NonNullable<T>) => VelozNode);
 }
 
-export function Match<T>(props: MatchProps<T>): MatchProps<T> {
-  return props;
+interface MatchDescriptor {
+  [MATCH]: true;
+  props: MatchProps<unknown>;
+}
+
+/** A branch of `<Switch>`. Renders nothing on its own. */
+export function Match<T>(props: MatchProps<T>): any {
+  return { [MATCH]: true, props } satisfies MatchDescriptor;
 }
 
 export interface SwitchProps {
-  fallback?: VelozNode;
-  children: MatchProps<unknown>[] | MatchProps<unknown>;
+  fallback?: unknown;
+  children?: unknown;
 }
 
-export function Switch(props: SwitchProps): Node {
-  const marker = document.createComment('Switch');
-  let currentNodes: Node[] = [];
+function isMatch(value: unknown): value is MatchDescriptor {
+  return value != null && typeof value === 'object' && MATCH in value;
+}
 
-  createEffect(() => {
-    const children = Array.isArray(props.children)
-      ? props.children
-      : [props.children];
+function collectMatches(children: unknown, out: MatchDescriptor[]): MatchDescriptor[] {
+  if (Array.isArray(children)) for (const c of children) collectMatches(c, out);
+  else if (isMatch(children)) out.push(children);
+  return out;
+}
 
-    clearNodes(currentNodes);
-    currentNodes = [];
+/** Renders the first `<Match>` whose `when` is truthy, or `fallback`. */
+export function Switch(props: SwitchProps): () => unknown {
+  const matches = collectMatches(props.children, []);
 
-    const parent = marker.parentNode;
-    if (!parent) return;
-
-    for (const match of children) {
-      if (match && match.when) {
-        let content: unknown;
-        if (typeof match.children === 'function') {
-          content = (match.children as (v: unknown) => VelozNode)(match.when);
-        } else {
-          content = match.children;
-        }
-        currentNodes = insertNodes(parent, marker, content);
-        return;
+  const selected = createMemo<{ index: number; value: unknown } | null>(
+    () => {
+      for (let i = 0; i < matches.length; i++) {
+        const value = access(matches[i].props.when);
+        if (value) return { index: i, value };
       }
+      return null;
+    },
+    undefined,
+    {
+      equals: (a, b) => {
+        if (!a || !b) return a === b;
+        if (a.index !== b.index) return false;
+        return typeof matches[a.index].props.children === 'function' ? a.value === b.value : true;
+      },
     }
+  );
 
-    if (props.fallback != null) {
-      currentNodes = insertNodes(parent, marker, props.fallback);
-    }
-  });
-
-  return marker;
-}
-
-function clearNodes(nodes: Node[]): void {
-  for (const node of nodes) {
-    node.parentNode?.removeChild(node);
-  }
-}
-
-function insertNodes(parent: Node, before: Node, content: unknown): Node[] {
-  const nodes: Node[] = [];
-  if (content instanceof Node) {
-    parent.insertBefore(content, before);
-    nodes.push(content);
-  } else if (Array.isArray(content)) {
-    for (const item of content) {
-      nodes.push(...insertNodes(parent, before, item));
-    }
-  } else if (content != null && typeof content !== 'boolean') {
-    const text = document.createTextNode(String(content));
-    parent.insertBefore(text, before);
-    nodes.push(text);
-  }
-  return nodes;
+  return () => {
+    const s = selected();
+    if (!s) return props.fallback ?? null;
+    const children = matches[s.index].props.children;
+    return typeof children === 'function' ? (children as (v: unknown) => unknown)(s.value) : children;
+  };
 }

@@ -1,168 +1,80 @@
-import { createEffect } from '@veloz/core';
+import { access } from '@velozjs/core';
+import { createElement } from '@velozjs/dom';
 import { hash } from './hash.js';
 import { insertCSS, hasStyle } from './sheet.js';
+import { scopeCSS } from './css.js';
 
-type StyledTag = keyof HTMLElementTagNameMap;
+type StyledTag = keyof HTMLElementTagNameMap | (string & {});
+type Value = string | number | null | undefined | false;
+type Interpolation<P> = Value | ((props: P) => Value);
 
-interface StyledComponent {
-  (props: Record<string, unknown>): HTMLElement;
+export interface StyledComponent<P = Record<string, unknown>> {
+  (props: P & Record<string, unknown>): any;
   __veloz_styled: true;
 }
 
-function evaluateTemplate(
-  strings: TemplateStringsArray,
-  values: unknown[],
-  props: Record<string, unknown>
-): string {
+type ElementFactory = (tag: string, props: Record<string, unknown>) => unknown;
+
+// Elements are created through the active JSX runtime: the DOM one by
+// default, the string one once @velozjs/ssr is loaded on the server.
+let factory: ElementFactory = (tag, props) => createElement(tag, props);
+
+/** Used by @velozjs/ssr to render styled components as HTML strings. */
+export function setElementFactory(fn: ElementFactory): void {
+  factory = fn;
+}
+
+function evaluate<P>(strings: TemplateStringsArray, values: Interpolation<P>[], props: P): string {
   let result = '';
   for (let i = 0; i < strings.length; i++) {
     result += strings[i];
     if (i < values.length) {
       const v = values[i];
-      result += typeof v === 'function' ? String(v(props)) : String(v ?? '');
+      const resolved = typeof v === 'function' ? v(props) : v;
+      result += resolved == null || resolved === false ? '' : String(resolved);
     }
   }
   return result;
 }
 
-function scopeCSS(cssText: string, className: string): string {
-  const selector = '.' + className;
-  const trimmed = cssText.trim();
-  if (!trimmed) return '';
-
-  const lines = trimmed.split('\n');
-  let result = '';
-  let hasTopLevel = false;
-  let topLevel = '';
-  let buffer = '';
-  let depth = 0;
-
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
-
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '{') depth++;
-      if (line[i] === '}') depth--;
-    }
-
-    if (depth === 0 && buffer === '' && !line.includes('{')) {
-      topLevel += line + '\n';
-      hasTopLevel = true;
-      continue;
-    }
-
-    buffer += line + '\n';
-
-    if (depth === 0 && buffer.trim()) {
-      const block = buffer.trim();
-      result += block.replace(/&/g, selector) + '\n';
-      buffer = '';
-    }
+function classFor(raw: string): string {
+  const className = hash(raw);
+  if (!hasStyle(className)) {
+    const scoped = scopeCSS(raw, className);
+    if (scoped) insertCSS(className, scoped);
   }
-
-  if (buffer.trim()) {
-    result += buffer.trim().replace(/&/g, selector) + '\n';
-  }
-
-  if (hasTopLevel) {
-    result = `${selector}{${topLevel.trim()}}` + '\n' + result;
-  }
-
-  return result.trim();
+  return className;
 }
 
-function appendChildren(el: HTMLElement, children: unknown): void {
-  if (children == null || typeof children === 'boolean') return;
-
-  if (typeof children === 'string' || typeof children === 'number') {
-    el.appendChild(document.createTextNode(String(children)));
-    return;
-  }
-
-  if (children instanceof Node) {
-    el.appendChild(children);
-    return;
-  }
-
-  if (Array.isArray(children)) {
-    for (const child of children) {
-      appendChildren(el, child);
-    }
-    return;
-  }
-
-  if (typeof children === 'function') {
-    const marker = document.createTextNode('');
-    el.appendChild(marker);
-    createEffect(() => {
-      const value = (children as () => unknown)();
-      if (value != null && typeof value !== 'boolean') {
-        marker.textContent = String(value);
-      } else {
-        marker.textContent = '';
-      }
-    });
-    return;
-  }
+function joinClass(base: string, extra: unknown): string {
+  const e = access(extra as string | (() => string));
+  return e ? `${base} ${e}` : base;
 }
 
+/**
+ * Styled components: styled('button')`...`. Function interpolations receive
+ * the props; when they read accessors, the class updates reactively.
+ */
 export function styled(tag: StyledTag) {
-  return function styledTemplate(
+  return function styledTemplate<P = Record<string, unknown>>(
     strings: TemplateStringsArray,
-    ...templateValues: unknown[]
-  ): StyledComponent {
-    const hasDynamic = templateValues.some(v => typeof v === 'function');
+    ...values: Interpolation<P>[]
+  ): StyledComponent<P> {
+    const dynamic = values.some((v) => typeof v === 'function');
+    const staticClass = dynamic ? '' : classFor(evaluate(strings, values, {} as P));
 
-    let staticClassName: string | null = null;
-    if (!hasDynamic) {
-      const raw = evaluateTemplate(strings, templateValues, {});
-      staticClassName = hash(raw);
-      const scoped = scopeCSS(raw, staticClassName);
-      if (scoped) insertCSS(staticClassName, scoped);
-    }
-
-    const component = function (props: Record<string, unknown>): HTMLElement {
-      const el = document.createElement(tag);
-
-      let className: string;
-      if (staticClassName) {
-        className = staticClassName;
-      } else {
-        const raw = evaluateTemplate(strings, templateValues, props);
-        className = hash(raw);
-        if (!hasStyle(className)) {
-          const scoped = scopeCSS(raw, className);
-          if (scoped) insertCSS(className, scoped);
-        }
-      }
-
-      el.className = props.class
-        ? `${className} ${props.class}`
-        : className;
-
+    const component = ((props: P & Record<string, unknown>) => {
+      const rest: Record<string, unknown> = {};
       for (const key of Object.keys(props)) {
-        if (key === 'class' || key === 'className' || key === 'children') continue;
-        if (key === 'ref') {
-          if (typeof props[key] === 'function') {
-            (props[key] as (el: HTMLElement) => void)(el);
-          }
-          continue;
-        }
-        if (key.startsWith('on') && typeof props[key] === 'function') {
-          const event = key.slice(2).toLowerCase();
-          el.addEventListener(event, props[key] as EventListener);
-          continue;
-        }
-        el.setAttribute(key, String(props[key]));
+        if (key === 'class' || key === 'className') continue;
+        Object.defineProperty(rest, key, Object.getOwnPropertyDescriptor(props, key)!);
       }
-
-      if (props.children != null) {
-        appendChildren(el, props.children);
-      }
-
-      return el;
-    } as StyledComponent;
+      const extra = props.class ?? props.className;
+      const base = () => staticClass || classFor(evaluate(strings, values, props));
+      rest.class =
+        dynamic || typeof extra === 'function' ? () => joinClass(base(), extra) : joinClass(staticClass, extra);
+      return factory(tag, rest);
+    }) as StyledComponent<P>;
 
     component.__veloz_styled = true;
     return component;

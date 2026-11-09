@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '../src/render';
 import { createElement } from '../src/jsx-runtime';
 import { Show } from '../src/components/Show';
-import { createSignal } from '@veloz/core';
+import { createSignal } from '@velozjs/core';
 
 describe('Show', () => {
   it('should render children when condition is truthy', () => {

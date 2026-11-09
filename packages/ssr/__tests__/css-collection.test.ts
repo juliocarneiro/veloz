@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { insertCSS, getSSRStyles, resetSSRStyles } from '@veloz/css';
+import { insertCSS, getSSRStyles, resetSSRStyles } from '@velozjs/css';
 
 beforeEach(() => {
   resetSSRStyles();

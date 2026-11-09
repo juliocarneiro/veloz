@@ -1,36 +1,31 @@
-import { createEffect } from '@veloz/core';
-import { validateAttribute, sanitizeURL } from './security.js';
-import { setEventHandler, isDelegatedEvent } from './events.js';
+import { createRenderEffect, isValidAttributeName } from '@velozjs/core';
+import { validateAttribute } from './security.js';
+import { setEventHandler } from './events.js';
 import { sanitize } from './sanitizer.js';
 
-const URL_ATTRIBUTES = new Set([
-  'href', 'src', 'action', 'formaction', 'poster', 'srcset',
-]);
+type Ref<T> = ((el: T) => void) | { current: T | null };
 
-const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const prevStyles = new WeakMap<Element, Set<string>>();
 
-export function applyProp(
-  el: HTMLElement,
-  name: string,
-  value: unknown,
-  isSVG = false
-): void {
+/** Event prop name → DOM event name: `onClick` → `click`, `onMouseEnter` → `mouseenter`. */
+export function eventNameFromProp(name: string): string | null {
+  if (name.length < 3 || !name.startsWith('on')) return null;
+  return name.slice(2).toLowerCase();
+}
+
+export function applyProp(el: Element, name: string, value: unknown, isSVG = false): void {
   if (name === 'ref') {
-    if (typeof value === 'function') {
-      (value as (el: HTMLElement) => void)(el);
-    }
+    setRef(el, value as Ref<Element> | null | undefined);
     return;
   }
 
   if (name === 'innerHTML') {
-    if (typeof value === 'string') {
-      el.innerHTML = sanitize(value);
-    }
+    el.innerHTML = typeof value === 'string' ? sanitize(value) : '';
     return;
   }
 
   if (name === 'style') {
-    applyStyle(el, value);
+    applyStyle(el as HTMLElement, value);
     return;
   }
 
@@ -40,95 +35,111 @@ export function applyProp(
   }
 
   if (name === 'classList') {
-    applyClassList(el, value as Record<string, boolean>);
+    applyClassList(el, value as Record<string, boolean> | null);
     return;
   }
 
-  if (name.startsWith('on')) {
-    const eventName = name.slice(2).toLowerCase();
-    if (typeof value === 'function') {
-      if (isDelegatedEvent(eventName)) {
-        setEventHandler(el, eventName, value as EventListener);
-      } else {
-        el.addEventListener(eventName, value as EventListener);
-      }
-    }
+  const eventName = eventNameFromProp(name);
+  if (eventName && (typeof value === 'function' || value == null)) {
+    setEventHandler(el, eventName, (value as EventListener) ?? null);
     return;
   }
 
-  if (!validateAttribute(name, value)) return;
-
-  if (URL_ATTRIBUTES.has(name) && typeof value === 'string') {
-    value = sanitizeURL(value);
+  if (!validateAttribute(name, value)) {
+    // Never leave a previous (safe) value next to a rejected one.
+    if (isValidAttributeName(name)) el.removeAttribute(name);
+    return;
   }
 
-  if (isSVG) {
-    if (value == null || value === false) {
+  setAttributeOrProperty(el, name, value, isSVG);
+}
+
+function setAttributeOrProperty(el: Element, name: string, value: unknown, isSVG: boolean): void {
+  const isAria = name.startsWith('aria-');
+  if (isSVG || isAria || name.startsWith('data-') || !(name in el)) {
+    if (value == null || (value === false && !isAria)) {
       el.removeAttribute(name);
     } else {
-      el.setAttribute(name, String(value));
+      el.setAttribute(name, value === true && !isAria ? '' : String(value));
     }
-  } else if (name in el && !isSVG) {
-    try {
-      (el as any)[name] = value;
-    } catch {
-      el.setAttribute(name, String(value));
-    }
-  } else if (value == null || value === false) {
-    el.removeAttribute(name);
-  } else {
-    el.setAttribute(name, value === true ? '' : String(value));
+    return;
+  }
+
+  // DOM property (value, checked, disabled, textContent...).
+  const current = (el as unknown as Record<string, unknown>)[name];
+  if (value == null) {
+    if (typeof current === 'boolean') (el as unknown as Record<string, unknown>)[name] = false;
+    else if (name === 'value' || name === 'textContent') (el as unknown as Record<string, unknown>)[name] = '';
+    else el.removeAttribute(name);
+    return;
+  }
+  try {
+    (el as unknown as Record<string, unknown>)[name] = value;
+  } catch {
+    el.setAttribute(name, String(value));
   }
 }
 
-export function applyReactiveProp(
-  el: HTMLElement,
-  name: string,
-  getter: () => unknown,
-  isSVG = false
-): void {
-  createEffect(() => {
+export function applyReactiveProp(el: Element, name: string, getter: () => unknown, isSVG = false): void {
+  createRenderEffect(() => {
     applyProp(el, name, getter(), isSVG);
   });
 }
 
-function applyStyle(
-  el: HTMLElement,
-  value: unknown
-): void {
-  if (typeof value === 'string') {
-    el.style.cssText = value;
-  } else if (value && typeof value === 'object') {
-    const styles = value as Record<string, string>;
-    for (const prop of Object.keys(styles)) {
-      const cssKey = prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-      el.style.setProperty(cssKey, styles[prop]);
-    }
-  } else {
-    el.removeAttribute('style');
-  }
+function setRef<T>(el: T, ref: Ref<T> | null | undefined): void {
+  if (typeof ref === 'function') ref(el);
+  else if (ref && typeof ref === 'object') ref.current = el;
 }
 
-function applyClass(el: HTMLElement, value: unknown): void {
+function toKebab(prop: string): string {
+  return prop.startsWith('--') ? prop : prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+}
+
+function applyStyle(el: HTMLElement, value: unknown): void {
+  const previous = prevStyles.get(el);
   if (typeof value === 'string') {
-    el.className = value;
-  } else if (Array.isArray(value)) {
-    el.className = value.filter(Boolean).join(' ');
-  } else if (value && typeof value === 'object') {
-    el.className = Object.entries(value as Record<string, boolean>)
+    el.style.cssText = value;
+    prevStyles.delete(el);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    const next = new Set<string>();
+    for (const [prop, v] of Object.entries(value as Record<string, unknown>)) {
+      const key = toKebab(prop);
+      if (v == null || v === false) continue;
+      el.style.setProperty(key, String(v));
+      next.add(key);
+    }
+    // Remove properties that were set last time but are gone now.
+    if (previous) for (const key of previous) if (!next.has(key)) el.style.removeProperty(key);
+    prevStyles.set(el, next);
+    return;
+  }
+  el.removeAttribute('style');
+  prevStyles.delete(el);
+}
+
+function classString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(classString).filter(Boolean).join(' ');
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v)
       .map(([k]) => k)
       .join(' ');
-  } else {
-    el.className = '';
   }
+  return '';
 }
 
-function applyClassList(
-  el: HTMLElement,
-  classes: Record<string, boolean>
-): void {
+function applyClass(el: Element, value: unknown): void {
+  const cls = classString(value);
+  if (cls) el.setAttribute('class', cls);
+  else el.removeAttribute('class');
+}
+
+function applyClassList(el: Element, classes: Record<string, boolean> | null): void {
+  if (!classes) return;
   for (const [name, active] of Object.entries(classes)) {
-    el.classList.toggle(name, !!active);
+    for (const token of name.split(/\s+/).filter(Boolean)) el.classList.toggle(token, !!active);
   }
 }

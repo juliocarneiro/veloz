@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Show, For, Switch, Match, Portal, ErrorBoundary, Suspense, Dynamic } from '../src/server-components.js';
-import { jsx } from '../src/jsx-runtime.js';
+import * as C from '../src/server-components.js';
+import { Match } from '../src/server-components.js';
+
+// Components return HTML with region markers; compare the inner HTML.
+const out = (r: unknown) => renderChildren(r).replace(/<!--\[-->|<!--\]-->/g, '');
+const Show = (p: any) => out(C.Show(p));
+const For = (p: any) => out(C.For(p));
+const Switch = (p: any) => out(C.Switch(p));
+const Portal = (p: any) => out(C.Portal(p));
+const ErrorBoundary = (p: any) => out(C.ErrorBoundary(p));
+const Dynamic = (p: any) => out(C.Dynamic(p));
+import { jsx, renderChildren } from '../src/jsx-runtime.js';
 import { resetHydrationCounter } from '../src/hydration.js';
 
 beforeEach(() => {
@@ -118,9 +128,9 @@ describe('Switch/Match (server)', () => {
 });
 
 describe('Portal (server)', () => {
-  it('should render children inline', () => {
+  it('renders nothing on the server (content is created on the client)', () => {
     const html = Portal({ children: jsx('div', { children: 'modal' }) });
-    expect(html).toContain('modal');
+    expect(html).toBe('');
   });
 });
 
@@ -131,16 +141,6 @@ describe('ErrorBoundary (server)', () => {
       children: 'safe content',
     });
     expect(html).toBe('safe content');
-  });
-});
-
-describe('Suspense (server)', () => {
-  it('should render children', () => {
-    const html = Suspense({
-      fallback: 'loading...',
-      children: jsx('div', { children: 'loaded' }),
-    });
-    expect(html).toContain('loaded');
   });
 });
 

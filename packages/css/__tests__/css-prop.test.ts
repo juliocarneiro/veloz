@@ -39,3 +39,16 @@ describe('processCssProp', () => {
     expect(a).toBe(b);
   });
 });
+
+describe('processCssProp regressions', () => {
+  it('scopes @media blocks with the class selector', async () => {
+    const { objectToScopedCSS } = await import('../src/object-to-css');
+    const out = objectToScopedCSS({ color: 'red', '@media (min-width: 40em)': { color: 'blue' }, '.title': { fontWeight: 700 } }, '.v-x');
+    expect(out).toBe('.v-x{color:red;}@media (min-width: 40em){.v-x{color:blue;}}.v-x .title{font-weight:700;}');
+  });
+
+  it('splits rules without breaking nested blocks', async () => {
+    const { splitRules } = await import('../src/sheet');
+    expect(splitRules('.a{x:1}@media (y){.a{x:2}}.b{z:3}')).toEqual(['.a{x:1}', '@media (y){.a{x:2}}', '.b{z:3}']);
+  });
+});

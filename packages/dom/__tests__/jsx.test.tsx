@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createElement, Fragment } from '../src/jsx-runtime';
-import { createSignal } from '@veloz/core';
+import { createSignal } from '@velozjs/core';
 
 describe('createElement', () => {
   it('should create a DOM element', () => {
@@ -118,6 +118,6 @@ describe('Fragment', () => {
 
   it('should handle empty children', () => {
     const result = Fragment({});
-    expect(result).toBeInstanceOf(Node);
+    expect(result).toBeNull();
   });
 });

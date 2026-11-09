@@ -1,43 +1,18 @@
-import { createEffect } from '@veloz/core';
+import { untrack } from '@velozjs/core';
 import { createElement } from '../jsx-runtime.js';
-import type { VelozNode } from '../types.js';
 
-export interface DynamicProps<T extends string | Function> {
-  component: T;
+export interface DynamicProps {
+  /** A tag name (`"h2"`) or a component. */
+  component: string | ((props: any) => unknown) | null | undefined | false;
   [key: string]: unknown;
 }
 
-export function Dynamic<T extends string | Function>(
-  props: DynamicProps<T>
-): Node {
+/**
+ * Renders the given tag or component with the remaining props. To switch it
+ * reactively, wrap it: `{() => <Dynamic component={tag()} />}`.
+ */
+export function Dynamic(props: DynamicProps): unknown {
   const { component, ...rest } = props;
-  const marker = document.createComment('Dynamic');
-  let currentNode: Node | null = null;
-
-  createEffect(() => {
-    const comp = component;
-    const parent = marker.parentNode;
-
-    if (currentNode && parent) {
-      parent.removeChild(currentNode);
-    }
-
-    if (comp) {
-      const result = createElement(comp as string | Function, rest as any);
-      const node = result instanceof Node
-        ? result
-        : Array.isArray(result)
-          ? (() => { const f = document.createDocumentFragment(); result.forEach(n => f.appendChild(n)); return f; })()
-          : document.createTextNode('');
-
-      if (parent) {
-        parent.insertBefore(node, marker);
-      }
-      currentNode = node;
-    } else {
-      currentNode = null;
-    }
-  });
-
-  return marker;
+  if (!component) return null;
+  return untrack(() => createElement(component, rest));
 }

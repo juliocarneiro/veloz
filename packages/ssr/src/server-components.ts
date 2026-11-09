@@ -1,91 +1,87 @@
-import { renderChildren } from './jsx-runtime.js';
-import { jsx } from './jsx-runtime.js';
+import { access, catchError, provideSuspense, type MaybeAccessor } from '@velozjs/core';
+import { jsx, renderChildren, rawHTML, type RawHTML } from './jsx-runtime.js';
+
+/*
+ * Server versions of the control-flow components. They mirror the client:
+ * what the client evaluates eagerly (conditions, list rows) is evaluated
+ * here when the component runs; what the client renders in a region is
+ * returned as a function, which the runtime wraps in region markers.
+ */
+
+const MATCH = Symbol.for('veloz.match');
 
 export interface ShowProps<T> {
-  when: T | undefined | null | false | (() => T | undefined | null | false);
+  when: MaybeAccessor<T | undefined | null | false>;
   fallback?: unknown;
-  children: unknown | ((value: T) => unknown);
+  children?: unknown | ((value: NonNullable<T>) => unknown);
 }
 
-export function Show<T>(props: ShowProps<T>): string {
-  const raw = props.when;
-  const condition = typeof raw === 'function' ? (raw as () => unknown)() : raw;
-
-  if (condition) {
-    if (typeof props.children === 'function') {
-      return renderChildren((props.children as (value: T) => unknown)(condition as T));
-    }
-    return renderChildren(props.children);
-  }
-
-  if (props.fallback != null) {
-    return renderChildren(props.fallback);
-  }
-
-  return '';
+export function Show<T>(props: ShowProps<T>): () => unknown {
+  const value = access(props.when);
+  return () => {
+    if (!value) return props.fallback ?? null;
+    const children = props.children;
+    return typeof children === 'function' ? (children as (v: NonNullable<T>) => unknown)(value as NonNullable<T>) : children;
+  };
 }
 
 export interface ForProps<T> {
-  each: T[] | (() => T[]);
+  each: MaybeAccessor<readonly T[] | undefined | null | false>;
   fallback?: unknown;
   children: (item: T, index: () => number) => unknown;
 }
 
-export function For<T>(props: ForProps<T>): string {
-  const raw = props.each;
-  const items = (typeof raw === 'function' ? (raw as () => T[])() : raw) ?? [];
-
-  if (items.length === 0) {
-    if (props.fallback != null) {
-      return renderChildren(props.fallback);
-    }
-    return '';
-  }
-
-  let result = '';
+export function For<T>(props: ForProps<T>): () => unknown {
+  const items = access(props.each) || [];
+  // Rows are created up front, like the client's keyed map.
+  let html = '';
   for (let i = 0; i < items.length; i++) {
     const index = i;
-    const content = props.children(items[i], () => index);
-    result += renderChildren(content);
+    html += renderChildren(props.children(items[i], () => index));
   }
-  return result;
+  return () => (items.length === 0 ? (props.fallback ?? null) : rawHTML(html));
 }
 
 export interface MatchProps<T> {
-  when: T | undefined | null | false;
-  children: unknown | ((value: T) => unknown);
+  when: MaybeAccessor<T | undefined | null | false>;
+  children?: unknown | ((value: NonNullable<T>) => unknown);
 }
 
-export function Match<T>(props: MatchProps<T>): MatchProps<T> {
-  return props;
+interface MatchDescriptor {
+  [MATCH]: true;
+  props: MatchProps<unknown>;
+}
+
+export function Match<T>(props: MatchProps<T>): any {
+  return { [MATCH]: true, props } satisfies MatchDescriptor;
 }
 
 export interface SwitchProps {
   fallback?: unknown;
-  children: MatchProps<unknown>[] | MatchProps<unknown>;
+  children?: unknown;
 }
 
-export function Switch(props: SwitchProps): string {
-  const children = Array.isArray(props.children)
-    ? props.children
-    : [props.children];
+function collectMatches(children: unknown, out: MatchDescriptor[]): MatchDescriptor[] {
+  if (Array.isArray(children)) for (const c of children) collectMatches(c, out);
+  else if (children != null && typeof children === 'object' && MATCH in children) out.push(children as MatchDescriptor);
+  return out;
+}
 
-  for (const match of children) {
-    if (match && match.when) {
-      if (typeof match.children === 'function') {
-        return renderChildren(
-          (match.children as (v: unknown) => unknown)(match.when)
-        );
-      }
-      return renderChildren(match.children);
+export function Switch(props: SwitchProps): () => unknown {
+  const matches = collectMatches(props.children, []);
+  let selected: { match: MatchDescriptor; value: unknown } | null = null;
+  for (const match of matches) {
+    const value = access(match.props.when);
+    if (value) {
+      selected = { match, value };
+      break;
     }
   }
-
-  if (props.fallback != null) {
-    return renderChildren(props.fallback);
-  }
-
-  return '';
+  return () => {
+    if (!selected) return props.fallback ?? null;
+    const children = selected.match.props.children;
+    return typeof children === 'function' ? (children as (v: unknown) => unknown)(selected.value) : children;
+  };
 }
 
 export interface PortalProps {
@@ -93,23 +89,43 @@ export interface PortalProps {
   children?: unknown;
 }
 
-export function Portal(props: PortalProps): string {
-  return renderChildren(props.children);
+/** Portals render on the client only (their target is not part of this HTML). */
+export function Portal(_props: PortalProps): RawHTML {
+  return rawHTML('');
 }
 
 export interface ErrorBoundaryProps {
-  fallback: (error: Error, reset: () => void) => unknown;
+  fallback: unknown | ((error: Error, reset: () => void) => unknown);
   children?: unknown;
 }
 
-export function ErrorBoundary(props: ErrorBoundaryProps): string {
-  try {
-    return renderChildren(props.children);
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    const noop = () => {};
-    return renderChildren(props.fallback(error, noop));
-  }
+export function ErrorBoundary(props: ErrorBoundaryProps): () => unknown {
+  return () => {
+    let failed: Error | null = null;
+    const html = catchError(
+      () => {
+        const children = props.children;
+        return renderChildren(typeof children === 'function' ? (children as () => unknown)() : children);
+      },
+      (err) => {
+        failed = err instanceof Error ? err : new Error(String(err));
+      }
+    );
+    if (!failed) return rawHTML(html ?? '');
+    const fallback = props.fallback;
+    return typeof fallback === 'function' ? (fallback as (e: Error, r: () => void) => unknown)(failed, () => {}) : fallback;
+  };
+}
+
+export interface DynamicProps {
+  component: string | ((props: any) => unknown) | null | undefined | false;
+  [key: string]: unknown;
+}
+
+export function Dynamic(props: DynamicProps): unknown {
+  const { component, ...rest } = props;
+  if (!component) return null;
+  return jsx(component, rest);
 }
 
 export interface SuspenseProps {
@@ -117,23 +133,20 @@ export interface SuspenseProps {
   children?: unknown;
 }
 
-export function Suspense(props: SuspenseProps): string {
-  return renderChildren(props.children);
-}
-
-export interface DynamicProps<T extends string | Function> {
-  component: T;
-  [key: string]: unknown;
-}
-
-export function Dynamic<T extends string | Function>(
-  props: DynamicProps<T>
-): string {
-  const { component, ...rest } = props;
-  if (!component) return '';
-
-  const result = jsx(component, rest);
-  return typeof result === 'object' && result !== null && 'value' in result
-    ? (result as { value: string }).value
-    : String(result);
+/**
+ * Renders the content when every resource read inside is settled, the
+ * fallback otherwise. With renderToStringAsync the data is awaited first, so
+ * the content is what gets sent.
+ */
+export function Suspense(props: SuspenseProps): () => unknown {
+  let pending = 0;
+  provideSuspense({
+    increment: () => pending++,
+    decrement: () => {
+      pending = Math.max(0, pending - 1);
+    },
+  });
+  // Created up front, like the client, so hydration keys stay in order.
+  const html = renderChildren(props.children);
+  return () => (pending > 0 ? (props.fallback ?? null) : rawHTML(html));
 }

@@ -1,16 +1,26 @@
 import { renderToString } from './render-to-string.js';
 
-export function renderToStream(fn: () => string): ReadableStream<string> {
-  return new ReadableStream({
+const CHUNK_SIZE = 16 * 1024;
+
+/**
+ * Renders `fn()` and returns a byte stream (`<style>` first, then the HTML),
+ * usable directly as a `Response` body. Rendering itself is synchronous;
+ * this does not stream async content out of order.
+ */
+export function renderToStream(fn: () => unknown): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
     start(controller) {
-      const { html, css } = renderToString(fn);
-
-      if (css) {
-        controller.enqueue(`<style data-veloz-css>${css}</style>`);
+      try {
+        const { html, css } = renderToString(fn);
+        if (css) controller.enqueue(encoder.encode(`<style data-veloz-css>${css}</style>`));
+        for (let i = 0; i < html.length; i += CHUNK_SIZE) {
+          controller.enqueue(encoder.encode(html.slice(i, i + CHUNK_SIZE)));
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
       }
-
-      controller.enqueue(html);
-      controller.close();
     },
   });
 }

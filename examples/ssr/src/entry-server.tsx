@@ -1,4 +1,4 @@
-import { renderToString } from '@veloz/ssr';
+import { renderToString } from '@velozjs/ssr';
 import { App } from './App';
 
 export function render() {

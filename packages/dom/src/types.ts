@@ -1,18 +1,32 @@
-export type VelozNode = Node | Node[] | string | number | boolean | null | undefined;
-export type VelozChild = VelozNode | (() => VelozNode);
-export type VelozComponent<P = {}> = (props: P) => VelozNode;
+/** Anything a component may return or JSX may contain. */
+export type VelozElement =
+  | Node
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly VelozElement[]
+  | (() => unknown)
+  | { readonly [key: symbol]: unknown };
+export type VelozNode = VelozElement;
+export type VelozChild = VelozElement;
+export type VelozComponent<P = {}> = (props: P) => VelozElement;
 
 type EventHandler<E = Event> = (event: E) => void;
+type MaybeFn<T> = T | (() => T);
 
 interface BaseHTMLAttributes {
   children?: unknown;
-  class?: string | (() => string) | Record<string, boolean>;
-  className?: string | (() => string);
+  class?: MaybeFn<string | Record<string, boolean> | (string | false | null | undefined)[]>;
+  className?: MaybeFn<string>;
   id?: string;
-  style?: string | Record<string, string>;
+  style?: MaybeFn<string | Record<string, string | number | null | undefined>>;
+  classList?: MaybeFn<Record<string, boolean>>;
   ref?: ((el: HTMLElement) => void) | { current: HTMLElement | null };
   css?: Record<string, unknown>;
-  innerHTML?: string;
+  /** Sanitized before it is set. */
+  innerHTML?: MaybeFn<string>;
 
   tabindex?: number | string;
   title?: string;
@@ -52,8 +66,37 @@ interface BaseHTMLAttributes {
   onDragover?: EventHandler<DragEvent>;
   onDrop?: EventHandler<DragEvent>;
 
-  [attr: `data-${string}`]: string | undefined;
-  [attr: `aria-${string}`]: string | undefined;
+  onDblClick?: EventHandler<MouseEvent>;
+  onMouseDown?: EventHandler<MouseEvent>;
+  onMouseUp?: EventHandler<MouseEvent>;
+  onMouseMove?: EventHandler<MouseEvent>;
+  onMouseEnter?: EventHandler<MouseEvent>;
+  onMouseLeave?: EventHandler<MouseEvent>;
+  onMouseOver?: EventHandler<MouseEvent>;
+  onMouseOut?: EventHandler<MouseEvent>;
+  onPointerDown?: EventHandler<PointerEvent>;
+  onPointerUp?: EventHandler<PointerEvent>;
+  onPointerMove?: EventHandler<PointerEvent>;
+  onPointerEnter?: EventHandler<PointerEvent>;
+  onPointerLeave?: EventHandler<PointerEvent>;
+  onKeyDown?: EventHandler<KeyboardEvent>;
+  onKeyUp?: EventHandler<KeyboardEvent>;
+  onFocusIn?: EventHandler<FocusEvent>;
+  onFocusOut?: EventHandler<FocusEvent>;
+  onContextMenu?: EventHandler<MouseEvent>;
+  onTouchStart?: EventHandler<TouchEvent>;
+  onTouchMove?: EventHandler<TouchEvent>;
+  onTouchEnd?: EventHandler<TouchEvent>;
+  onToggle?: EventHandler<Event>;
+  onClose?: EventHandler<Event>;
+  onLoad?: EventHandler<Event>;
+  onError?: EventHandler<Event>;
+
+  [attr: `data-${string}`]: MaybeFn<string | number | boolean | undefined>;
+  [attr: `aria-${string}`]: MaybeFn<string | number | boolean | undefined>;
+  [attr: `on${string}`]: EventHandler<any> | undefined;
+  /** Any other attribute (SVG `d`, `viewBox`, custom elements...). */
+  [attr: string]: unknown;
 }
 
 interface InputAttributes extends BaseHTMLAttributes {
@@ -128,7 +171,7 @@ interface OptionAttributes extends BaseHTMLAttributes {
 }
 
 export namespace JSX {
-  export type Element = Node | Node[];
+  export type Element = VelozElement;
 
   export interface ElementChildrenAttribute {
     children: {};

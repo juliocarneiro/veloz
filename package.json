@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "description": "Veloz.js - A blazing fast reactive frontend framework",
   "scripts": {
-    "build": "pnpm -r run build",
+    "build": "pnpm --filter \"./packages/*\" run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "tsc --noEmit",
-    "clean": "pnpm -r run clean"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "pnpm -r run clean",
+    "release": "pnpm typecheck && pnpm test && pnpm build && pnpm --filter \"./packages/*\" publish --access public"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
@@ -19,13 +20,8 @@
     "typescript": "^5.7.0",
     "vitest": "^3.1.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=9.0.0"
-  }
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.1.2"
 }

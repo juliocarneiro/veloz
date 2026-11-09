@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { renderToString } from '../src/render-to-string.js';
 import { jsx } from '../src/jsx-runtime.js';
-import { css } from '@veloz/css';
-import { createSignal } from '@veloz/core';
+import { css } from '@velozjs/css';
+import { createSignal } from '@velozjs/core';
 
 describe('renderToString', () => {
   it('should return html and css', () => {

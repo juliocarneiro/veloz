@@ -1,29 +1,59 @@
 {
-  "name": "@veloz/css",
+  "name": "@velozjs/css",
   "version": "0.1.0",
-  "description": "CSS-in-JS module for Veloz.js with auto-scoping",
+  "description": "Scoped CSS-in-JS for Veloz: css``, styled() and the css prop. CSP-friendly, SSR-ready.",
+  "keywords": [
+    "veloz",
+    "velozjs",
+    "signals",
+    "reactive",
+    "fine-grained",
+    "jsx",
+    "css-in-js",
+    "styled",
+    "css"
+  ],
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./dist/index.js"
+  ],
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch"
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@veloz/dom": "workspace:*"
+    "@velozjs/core": "workspace:^",
+    "@velozjs/dom": "workspace:^"
   },
-  "peerDependencies": {
-    "@veloz/core": "workspace:*"
+  "engines": {
+    "node": ">=20"
   },
-  "sideEffects": false,
-  "license": "MIT"
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Julio Carneiro (https://juliocarneiro.dev)",
+  "license": "MIT",
+  "homepage": "https://github.com/juliocarneiro/veloz#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juliocarneiro/veloz.git",
+    "directory": "packages/css"
+  },
+  "bugs": {
+    "url": "https://github.com/juliocarneiro/veloz/issues"
+  }
 }

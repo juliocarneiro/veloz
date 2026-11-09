@@ -1,84 +1,51 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
 | Version | Supported |
-|---------|-----------|
-| 0.1.x   | Yes       |
+| --- | --- |
+| 0.1.x | Yes |
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-If you discover a security vulnerability in Veloz.js, please report it responsibly.
+Please **do not open a public issue** for security problems. Report them privately through GitHub: [Security → Report a vulnerability](https://github.com/juliocarneiro/veloz/security/advisories/new).
 
-**Do NOT open a public issue for security vulnerabilities.**
+Include what you found, how to reproduce it, and the impact you expect. You will get an answer within a few days; fixes for confirmed issues ship as patch releases and are credited in the advisory unless you prefer otherwise.
 
-Instead, please email security concerns to: **security@veloz.dev** (or open a private security advisory on GitHub).
+## What Veloz protects against
 
-### What to include
+### Text is never HTML
 
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+The DOM renderer inserts text with `createTextNode`, and the SSR renderer escapes `& < > " '` in text and attribute values. Strings in JSX can't create elements.
 
-### Response Timeline
+### `innerHTML` is sanitized
 
-- **Acknowledgment**: within 48 hours
-- **Assessment**: within 1 week
-- **Fix release**: within 2 weeks for critical issues
+`innerHTML` on an element always goes through `sanitize()`: an allowlist of tags and attributes, no `on*` attributes, no `srcdoc`/`formaction`, unsafe URLs replaced by `about:blank`, and `rel="noopener noreferrer"` on links. When the browser supports Trusted Types, the output is wrapped in a `veloz-sanitize` policy (if the page's CSP doesn't allow that policy name, Veloz falls back to plain strings instead of throwing).
 
-## Security Model
+On the server there is no DOM to sanitize with, so SSR does **not** print `innerHTML`; the client sets it, sanitized, during hydration.
 
-Veloz.js implements a 7-layer security model:
+### URLs can't run script
 
-### Layer 1: XSS Prevention in JSX Runtime
-All text content is inserted via `textContent` / `createTextNode`. The JSX runtime **never** uses `innerHTML` for text rendering. This makes XSS through text injection impossible by design.
+`href`, `src`, `action`, `formaction`, `srcset`, `poster`, `xlink:href` and other URL attributes are checked on the client, in the sanitizer and in SSR with one shared function. It first removes the characters browsers ignore when reading a URL scheme (tabs, newlines, control characters, spaces), so `java\tscript:` or `\x01javascript:` are caught. `javascript:` and `vbscript:` are always blocked; `data:` is allowed only for raster images (`png`, `gif`, `jpeg`, `webp`, `avif`, `bmp`) in `src`, `poster` and `srcset`. A rejected value removes the attribute instead of leaving an older one in place.
 
-### Layer 2: Built-in HTML Sanitizer
-When developers explicitly need to insert raw HTML, Veloz provides a built-in sanitizer with:
-- Allowlist of safe tags (no `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`)
-- Allowlist of safe attributes (no `on*` event handlers)
-- URL validation (blocks `javascript:`, `data:`, `vbscript:` schemes)
-- Automatic `rel="noopener noreferrer"` on links
-- Trusted Types API integration
+### Attribute names can't inject markup
 
-### Layer 3: Attribute Validation
-- String event handlers (`onclick="..."`) are blocked - only functions allowed
-- URL attributes (`href`, `src`, `action`) are validated against dangerous schemes
-- Warnings in development mode for unsafe patterns
+Names with spaces, quotes, `=`, `>` or other characters outside `[A-Za-z_:][-A-Za-z0-9_:.]*` are rejected, both in the browser and in SSR. Tag names are validated in SSR too. This matters when props are spread from data you don't control.
 
-### Layer 4: Prototype Pollution Protection
-- Internal stores use `Object.create(null)` (no prototype chain)
-- Forbidden keys (`__proto__`, `constructor`, `prototype`) are blocked with warnings
-- Component props are frozen in development mode
+### Event handlers are functions
 
-### Layer 5: CSP Compatibility
-Veloz.js is fully compatible with strict Content Security Policies:
-- Zero use of `eval()` or `new Function()`
-- Zero use of `document.write()`
-- Zero inline script injection
-- Dynamic styles use `element.style.setProperty()` (CSP-safe)
+String handlers (`onclick="..."`) are rejected. Handlers are stored on a private symbol, never written as attributes, and SSR never prints `on*` props.
 
-### Layer 6: Secure Event System
-- Event delegation uses internal Symbols (not DOM attributes)
-- Handlers cannot be injected via HTML attribute manipulation
-- Event propagation is controlled internally
+### Prototype pollution
 
-### Layer 7: Trusted Types API
-When the browser supports Trusted Types (baseline since February 2026), Veloz automatically creates a `veloz-sanitize` policy that wraps all HTML sanitization output in `TrustedHTML` objects.
+Internal maps use `Object.create(null)`, and `validateKey()` rejects `__proto__`, `constructor` and `prototype` for code that builds objects from user input.
 
-### Layer 8: SSR Security
+### Content Security Policy
 
-Server-side rendering maintains the same security guarantees as client rendering:
+No `eval`, `new Function`, `document.write` or inline scripts. Runtime styles go to a constructable stylesheet (`adoptedStyleSheets`), falling back to a single `<style data-veloz-css>` element. Server CSS escapes `</style` so a style value can't close the tag.
 
-- **HTML escaping**: All text content and attribute values are escaped during SSR (`&`, `<`, `>`, `"`, `'`) to prevent XSS in server-rendered HTML
-- **No raw interpolation**: The server JSX runtime never interpolates user input directly into HTML -- all values pass through `escapeHTML` or `escapeAttr`
-- **Event handlers stripped**: `on*` props are excluded from SSR output (they are attached during client hydration only)
-- **URL sanitization**: URL attributes (`href`, `src`, etc.) are validated on the server with the same rules as the client renderer, blocking `javascript:`, `data:`, and `vbscript:` schemes
-- **CSS hash isolation**: CSS class names are deterministic hashes, preventing class name collision attacks
-- **SSR/client boundary enforcement**: The Vite plugin's `transform` hook ensures that during SSR, JSX and component imports are redirected to the server runtime (`@veloz/ssr`), preventing accidental execution of client DOM APIs on the server
-- **CSS hydration safety**: On the client, styles are auto-detected from `<style data-veloz-css>` tags that the server originally generated -- no external CSS is blindly trusted, and no `innerHTML` or `eval` is used
+## Your responsibilities
 
-## Dependencies
-
-The `@veloz/core` package has **zero external dependencies**, eliminating supply chain risk for the reactive system.
+- Don't pass untrusted strings to `innerHTML` and expect them to keep markup the sanitizer removes; extend `sanitize()` options deliberately.
+- URL checks block script execution, not open redirects: validate destinations that come from users.
+- Style values from users can still change how your page looks; don't put untrusted input in `css` / `style` without validation.
