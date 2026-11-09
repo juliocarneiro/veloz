@@ -2,6 +2,8 @@
 
 Vite plugin for [Veloz](https://github.com/juliocarneiro/veloz): configures JSX for `@velozjs/dom`, and during SSR (dev `ssrLoadModule` and `vite build --ssr`) resolves your app's imports of `@velozjs/dom` to `@velozjs/ssr`, so the same components render to HTML.
 
+[Documentation](https://veloz-site.vercel.app) · [GitHub](https://github.com/juliocarneiro/veloz)
+
 ```bash
 npm install -D vite-plugin-veloz
 ```

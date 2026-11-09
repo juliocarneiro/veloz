@@ -2,6 +2,8 @@
 
 Server-side rendering for Veloz. Renders the same components to HTML with hydration markers and collected styles; `hydrate()` from `@velozjs/dom` picks them up on the client.
 
+[Documentation](https://veloz-site.vercel.app) · [GitHub](https://github.com/juliocarneiro/veloz)
+
 ```bash
 npm install @velozjs/ssr
 ```
