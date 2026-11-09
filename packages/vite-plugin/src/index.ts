@@ -2,7 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { version as viteVersion, type Plugin, type UserConfig } from 'vite';
 
-const viteMajor = Number.parseInt(viteVersion, 10) || 0;
+function majorOf(version: string | undefined): number {
+  return Number.parseInt(version ?? '', 10) || 0;
+}
 const JSX_IMPORT_SOURCE = '@velozjs/dom';
 
 export interface VelozPluginOptions {
@@ -73,9 +75,12 @@ export default function velozPlugin(options: VelozPluginOptions = {}): Plugin {
     enforce: 'pre',
 
     config() {
-      // Vite 8 transforms with Oxc; earlier versions with esbuild.
+      // Vite 8 transforms with Oxc; earlier versions with esbuild. Ask the Vite
+      // that is running (this.meta, Vite 7+): the imported `vite` can be another
+      // copy, e.g. in a monorepo or when this plugin is linked.
+      const running = (this as { meta?: { viteVersion?: string } } | undefined)?.meta?.viteVersion;
       const jsx =
-        viteMajor >= 8
+        majorOf(running ?? viteVersion) >= 8
           ? { oxc: { jsx: { runtime: 'automatic', importSource: JSX_IMPORT_SOURCE } } }
           : { esbuild: { jsx: 'automatic', jsxImportSource: JSX_IMPORT_SOURCE } };
       return {

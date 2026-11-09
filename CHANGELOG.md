@@ -7,7 +7,7 @@ Fixes found while building a real site with 0.1.0. Upgrading is recommended for 
 ### Vite plugin
 
 - SSR now works when the packages come from `node_modules`: `@velozjs/dom` and `@velozjs/ssr` are no longer externalized, so app imports are redirected and a single copy of the SSR runtime is used. (In 0.1.0 this only worked with linked workspace packages.)
-- Vite 8 support: JSX is configured through `oxc` on Vite 8 and `esbuild` on older versions.
+- Vite 8 support: JSX is configured through `oxc` on Vite 8 and `esbuild` on older versions, based on the Vite that is running (`this.meta.viteVersion`), not on whichever `vite` copy the plugin happens to import.
 
 ### Server rendering
 
