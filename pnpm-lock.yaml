@@ -76,6 +76,8 @@ importers:
 
   packages/core: {}
 
+  packages/create-veloz: {}
+
   packages/css:
     dependencies:
       '@velozjs/core':

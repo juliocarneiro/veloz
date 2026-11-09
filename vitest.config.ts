@@ -30,6 +30,7 @@ export default defineConfig({
       project('css', 'jsdom'),
       project('ssr', 'node'),
       project('vite-plugin', 'node'),
+      { test: { name: 'create-veloz', environment: 'node', include: ['packages/create-veloz/__tests__/**/*.test.ts'] } },
     ],
   },
 });

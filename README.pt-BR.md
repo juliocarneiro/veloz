@@ -19,9 +19,18 @@
 | [`@velozjs/dom`](packages/dom) | Runtime JSX, `render`, `hydrate`, `Show`, `For`, `Switch`, `ErrorBoundary`, `Portal`, sanitizador. |
 | [`@velozjs/css`](packages/css) | `css`, `styled`, a prop `css`, coleta de estilos no SSR. |
 | [`@velozjs/ssr`](packages/ssr) | `renderToString`, `renderToStream`, versões de servidor dos componentes. |
+| [`create-veloz`](packages/create-veloz) | `npm create veloz@latest`: um projeto novo, pronto para rodar. |
 | [`vite-plugin-veloz`](packages/vite-plugin) | Configuração do JSX e resolução de módulos no SSR para o Vite. |
 
 ## Começo rápido
+
+```bash
+npm create veloz@latest
+```
+
+Escolha um modelo (`app` para uma aplicação de página única, `ssr` para renderização no servidor com dados assíncronos), e ele instala tudo e mostra como começar. Vite, TypeScript e o plugin já vêm configurados.
+
+### Adicionando o Veloz a um projeto existente
 
 ```bash
 npm install @velozjs/dom @velozjs/css

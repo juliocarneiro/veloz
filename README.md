@@ -20,8 +20,17 @@
 | [`@velozjs/css`](packages/css) | `css`, `styled`, the `css` prop, SSR style collection. |
 | [`@velozjs/ssr`](packages/ssr) | `renderToString`, `renderToStream`, server versions of the components. |
 | [`vite-plugin-veloz`](packages/vite-plugin) | JSX setup and SSR module resolution for Vite. |
+| [`create-veloz`](packages/create-veloz) | `npm create veloz@latest`: a new project, ready to run. |
 
 ## Quick start
+
+```bash
+npm create veloz@latest
+```
+
+Pick a template (`app` for a single-page app, `ssr` for server rendering with async data), and it installs everything and tells you how to start. Vite, TypeScript and the plugin come configured.
+
+### Adding Veloz to an existing project
 
 ```bash
 npm install @velozjs/dom @velozjs/css

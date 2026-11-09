@@ -1,5 +1,13 @@
 # Changelog
 
+## create-veloz 0.1.1
+
+New package: `npm create veloz@latest` creates a project that is ready to run, with Vite, TypeScript and the plugin configured.
+
+- Templates: `app` (single-page app) and `ssr` (server rendering, hydration and async data, with a Node server for dev and production).
+- Asks for the name and template, installs with the package manager that ran it (npm, pnpm, yarn or bun) and prints the next commands. `--template`, `--install` and `--no-install` skip the prompts; outside a terminal it never asks.
+- No dependencies. The template code is type-checked in this repository on every `pnpm typecheck`.
+
 ## 0.1.1
 
 Fixes found while building a real site with 0.1.0. Upgrading is recommended for everyone.
