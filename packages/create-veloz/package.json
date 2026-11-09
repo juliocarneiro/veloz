@@ -1,0 +1,43 @@
+{
+  "name": "create-veloz",
+  "version": "0.1.1",
+  "description": "Create a Veloz app: npm create veloz@latest",
+  "keywords": [
+    "veloz",
+    "velozjs",
+    "create",
+    "scaffold",
+    "starter",
+    "template",
+    "vite",
+    "ssr"
+  ],
+  "type": "module",
+  "bin": {
+    "create-veloz": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Julio Carneiro (https://juliocarneiro.dev)",
+  "license": "MIT",
+  "homepage": "https://veloz-site.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juliocarneiro/veloz.git",
+    "directory": "packages/create-veloz"
+  },
+  "bugs": {
+    "url": "https://github.com/juliocarneiro/veloz/issues"
+  }
+}
