@@ -2,6 +2,8 @@
 
 Scoped CSS-in-JS for Veloz: `css` tagged templates, `styled()` components and the `css` prop. Styles go to a constructable stylesheet (CSP-friendly), are deduplicated by content hash, and are collected during SSR.
 
+[Documentation](https://veloz-site.vercel.app) · [GitHub](https://github.com/juliocarneiro/veloz)
+
 ```bash
 npm install @velozjs/css
 ```

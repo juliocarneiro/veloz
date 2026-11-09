@@ -2,6 +2,8 @@
 
 Veloz's reactive core: signals, memos and effects with glitch-free, batched updates and ownership-based cleanup. No DOM required; runs in browsers, Node, workers and edge runtimes.
 
+[Documentation](https://veloz-site.vercel.app) · [GitHub](https://github.com/juliocarneiro/veloz)
+
 ```bash
 npm install @velozjs/core
 ```

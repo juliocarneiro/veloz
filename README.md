@@ -2,7 +2,7 @@
 
 **Fine-grained reactive UI with JSX. No virtual DOM, no re-renders: signals update the exact DOM nodes that depend on them.**
 
-[Português](README.pt-BR.md)
+**[Documentation](https://veloz-site.vercel.app)** · [Português](README.pt-BR.md)
 
 - **Signals, memos and effects** with glitch-free, batched updates and automatic cleanup.
 - **Components run once.** JSX creates real DOM nodes; reactivity lives in the functions you pass.

@@ -2,7 +2,7 @@
 
 **Interface reativa de granularidade fina com JSX. Sem DOM virtual, sem re-render: os signals atualizam exatamente os nós do DOM que dependem deles.**
 
-[English](README.md)
+**[Documentação](https://veloz-site.vercel.app/pt/)** · [English](README.md)
 
 - **Signals, memos e effects** com atualizações em lote, sem estados intermediários inconsistentes, e limpeza automática.
 - **Componentes rodam uma vez.** O JSX cria nós reais do DOM; a reatividade está nas funções que você passa.

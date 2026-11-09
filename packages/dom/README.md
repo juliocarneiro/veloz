@@ -2,6 +2,8 @@
 
 The Veloz DOM renderer: a JSX runtime that creates real DOM nodes, fine-grained updates through signals, control flow components, hydration of server-rendered HTML and built-in XSS protection.
 
+[Documentation](https://veloz-site.vercel.app) · [GitHub](https://github.com/juliocarneiro/veloz)
+
 ```bash
 npm install @velozjs/dom
 ```

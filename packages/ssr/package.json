@@ -65,7 +65,7 @@
   },
   "author": "Julio Carneiro (https://juliocarneiro.dev)",
   "license": "MIT",
-  "homepage": "https://github.com/juliocarneiro/veloz#readme",
+  "homepage": "https://veloz-site.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/juliocarneiro/veloz.git",
