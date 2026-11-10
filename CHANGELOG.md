@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.2
+
+Found while moving the salve-css site to Veloz.
+
+### Server rendering
+
+- `@velozjs/ssr` now exports everything `@velozjs/dom` does. During SSR the Vite plugin points `@velozjs/dom` imports at `@velozjs/ssr`, so a name missing there broke the server bundle at load time, even if it was never called:
+  - `createElement`, so JSX-free code (`createElement as h`) renders on the server and hydrates in the browser.
+  - `sanitizeURL`, `validateAttribute` and `isExternalURL`, with the same checks as in the browser.
+  - `toNodes`, `setupDelegation`, `setEventHandler` and `registerCssPropHandler` as server stubs (`toNodes` explains that it needs the DOM).
+- A test now fails if the two packages' exports drift apart again.
+
+### Types
+
+- Numeric attributes accept numeric strings, as in HTML: `<progress value="64">`, `<td colspan="2">`, `<textarea rows="4">`, `maxlength`, `size`, `<ol start>` and `<meter>` values. Non-numeric strings (`value="lots"`) are still an error.
+
+### Packages
+
+- The npm `homepage` of every package points to the documentation site.
+
 ## create-veloz 0.1.1
 
 New package: `npm create veloz@latest` creates a project that is ready to run, with Vite, TypeScript and the plugin configured.

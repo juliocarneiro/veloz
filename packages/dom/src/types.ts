@@ -133,6 +133,8 @@ export interface DOMAttributes<T extends Element> extends LowerEventProps<T>, Ca
 }
 
 type A<T> = MaybeFn<T | undefined>;
+/** A number, or a string holding one: `rows={4}` and `rows="4"` are both valid HTML. */
+type Num = number | `${number}`;
 
 interface FormControl {
   name?: A<string>;
@@ -157,25 +159,25 @@ interface ElementAttributes {
   input: FormControl & {
     type?: A<string>; value?: A<string | number | readonly string[]>; checked?: A<boolean>; indeterminate?: A<boolean>;
     placeholder?: A<string>; readonly?: A<boolean>; min?: A<string | number>; max?: A<string | number>; step?: A<string | number>;
-    pattern?: A<string>; maxlength?: A<number>; minlength?: A<number>; multiple?: A<boolean>; accept?: A<string>; list?: A<string>; size?: A<number>;
+    pattern?: A<string>; maxlength?: A<Num>; minlength?: A<Num>; multiple?: A<boolean>; accept?: A<string>; list?: A<string>; size?: A<Num>;
   };
   label: { for?: A<string>; htmlFor?: A<string> };
   link: { href?: A<string>; rel?: A<string>; as?: A<string>; type?: A<string>; media?: A<string>; crossorigin?: A<string>; integrity?: A<string> };
   meta: { name?: A<string>; content?: A<string>; charset?: A<string>; 'http-equiv'?: A<string>; property?: A<string> };
-  meter: { value?: A<number>; min?: A<number>; max?: A<number>; low?: A<number>; high?: A<number>; optimum?: A<number> };
-  ol: { start?: A<number>; reversed?: A<boolean>; type?: A<string> };
+  meter: { value?: A<Num>; min?: A<Num>; max?: A<Num>; low?: A<Num>; high?: A<Num>; optimum?: A<Num> };
+  ol: { start?: A<Num>; reversed?: A<boolean>; type?: A<string> };
   optgroup: { label?: A<string>; disabled?: A<boolean> };
   option: { value?: A<string | number>; selected?: A<boolean>; disabled?: A<boolean>; label?: A<string> };
   output: { for?: A<string>; name?: A<string>; form?: A<string> };
-  progress: { value?: A<number>; max?: A<number> };
+  progress: { value?: A<Num>; max?: A<Num> };
   script: { src?: A<string>; type?: A<string>; async?: A<boolean>; defer?: A<boolean>; nonce?: A<string>; crossorigin?: A<string>; integrity?: A<string> };
-  select: FormControl & { value?: A<string | number | readonly string[]>; multiple?: A<boolean>; size?: A<number> };
+  select: FormControl & { value?: A<string | number | readonly string[]>; multiple?: A<boolean>; size?: A<Num> };
   slot: { name?: A<string> };
   source: { src?: A<string>; srcset?: A<string>; type?: A<string>; media?: A<string>; sizes?: A<string> };
   style: { media?: A<string>; nonce?: A<string> };
-  td: { colspan?: A<number>; rowspan?: A<number>; headers?: A<string> };
-  th: { colspan?: A<number>; rowspan?: A<number>; headers?: A<string>; scope?: A<string>; abbr?: A<string> };
-  textarea: FormControl & { value?: A<string>; placeholder?: A<string>; readonly?: A<boolean>; rows?: A<number>; cols?: A<number>; maxlength?: A<number>; minlength?: A<number>; wrap?: A<string> };
+  td: { colspan?: A<Num>; rowspan?: A<Num>; headers?: A<string> };
+  th: { colspan?: A<Num>; rowspan?: A<Num>; headers?: A<string>; scope?: A<string>; abbr?: A<string> };
+  textarea: FormControl & { value?: A<string>; placeholder?: A<string>; readonly?: A<boolean>; rows?: A<Num>; cols?: A<Num>; maxlength?: A<Num>; minlength?: A<Num>; wrap?: A<string> };
   time: { datetime?: A<string> };
   track: { src?: A<string>; kind?: A<string>; label?: A<string>; srclang?: A<string>; default?: A<boolean> };
 }

@@ -1,6 +1,6 @@
 {
   "name": "@velozjs/css",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Scoped CSS-in-JS for Veloz: css``, styled() and the css prop. CSP-friendly, SSR-ready.",
   "keywords": [
     "veloz",

@@ -1,6 +1,6 @@
 {
   "name": "@velozjs/ssr",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Server-side rendering for Veloz: renderToString, renderToStream and hydration markers.",
   "keywords": [
     "veloz",
