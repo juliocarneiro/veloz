@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-veloz",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Vite plugin for Veloz: JSX setup and SSR module resolution.",
   "keywords": [
     "vite",

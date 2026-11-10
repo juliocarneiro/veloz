@@ -11,6 +11,7 @@ export { renderToStream } from './render-to-stream.js';
 export { escapeHTML, escapeAttr } from './escape.js';
 export { resetHydrationCounter } from './hydration.js';
 export { jsx, jsxs, jsxDEV, Fragment, renderChildren } from './jsx-runtime.js';
+export { validateAttribute, sanitizeURL, isExternalURL } from './security.js';
 
 export { Show, For, Switch, Match, Portal, ErrorBoundary, Dynamic, Suspense } from './server-components.js';
 export type {
@@ -70,6 +71,20 @@ export function render(): () => void {
 export function hydrate(): () => void {
   throw new Error('[Veloz SSR] hydrate() runs in the browser. Use renderToString() on the server.');
 }
+/** JSX without a compiler, same signature as in @velozjs/dom. */
+export function createElement(tag: string | Function, props: Record<string, unknown> | null, ...children: unknown[]): any {
+  if (children.length === 0) return jsx(tag, props);
+  return jsx(tag, { ...props, children: children.length === 1 ? children[0] : children });
+}
+
+/** DOM-only helpers. They exist here so shared code can import them; on the server they do nothing. */
+export function setupDelegation(): void {}
+export function setEventHandler(): void {}
+export function registerCssPropHandler(): void {}
+export function toNodes(): never {
+  throw new Error('[Veloz SSR] toNodes() needs the DOM. Call it in the browser, e.g. inside onMount().');
+}
+
 export function sanitize(html: string): string {
   return html.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }

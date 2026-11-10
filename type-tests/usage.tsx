@@ -80,6 +80,20 @@ hydrate(() => <Badge count={1} />, document.body);
 const html: string = renderToString(() => <Badge count={1} />).html;
 renderToStringAsync(() => <Badge count={1} />, { timeout: 100 }).then((r) => r.script);
 
+// Numeric attributes take a number or a numeric string, as in HTML.
+const nums = (
+  <>
+    <progress value="64" max="100" />
+    <progress value={64} max={() => 100} />
+    <meter value="0.6" min="0" max="1" low="0.2" high="0.8" optimum="0.5" />
+    <textarea rows="4" cols={40} maxlength="200" />
+    <input maxlength="10" minlength="2" size="20" />
+    <select size="3" />
+    <ol start="3" />
+    <table><tbody><tr><td colspan="2" rowspan="1" /><th colspan={2} /></tr></tbody></table>
+  </>
+);
+
 // Things that must not compile.
 // @ts-expect-error string handlers are not allowed
 const bad1 = <button onClick="alert(1)" />;
@@ -87,5 +101,7 @@ const bad1 = <button onClick="alert(1)" />;
 const bad2 = <input ref={(el: HTMLCanvasElement) => el.getContext("2d")} />;
 // @ts-expect-error For children must be a function
 const bad3 = <For each={[1]}><li /></For>;
+// @ts-expect-error numeric attributes reject non-numeric strings
+const bad4 = <progress value="lots" />;
 
-export { a, b, c, d, e, f, g, h1, flow, s1, s2, cls, el, html, bad1, bad2, bad3 };
+export { a, b, c, d, e, f, g, h1, flow, s1, s2, cls, el, html, nums, bad1, bad2, bad3, bad4 };

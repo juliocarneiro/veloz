@@ -1,6 +1,6 @@
 {
   "name": "@velozjs/dom",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Veloz DOM renderer: JSX runtime, control flow, hydration and built-in XSS protection.",
   "keywords": [
     "veloz",
