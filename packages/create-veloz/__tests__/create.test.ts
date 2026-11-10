@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,8 +64,28 @@ describe('scaffold', () => {
     scaffold({ dir: ssr, template: 'ssr', version: '0.1.1' });
     expect(readJson(join(app, 'package.json')).dependencies['@velozjs/ssr']).toBeUndefined();
     expect(readJson(join(ssr, 'package.json')).dependencies['@velozjs/ssr']).toBe('^0.1.0');
-    expect(existsSync(join(ssr, 'server.js'))).toBe(true);
-    expect(existsSync(join(app, 'server.js'))).toBe(false);
+    expect(existsSync(join(ssr, 'server', 'index.js'))).toBe(true);
+    expect(existsSync(join(app, 'server'))).toBe(false);
+  });
+
+  it('keeps components, styles and data in their own folders', () => {
+    const app = join(tmp(), 'a');
+    const ssr = join(tmp(), 's');
+    scaffold({ dir: app, template: 'app', version: '0.1.1' });
+    scaffold({ dir: ssr, template: 'ssr', version: '0.1.1' });
+    for (const dir of [app, ssr]) {
+      for (const file of ['src/App.tsx', 'src/components/Counter.tsx', 'src/components/Logo.tsx', 'src/styles/global.css']) {
+        expect(existsSync(join(dir, file)), file).toBe(true);
+      }
+      expect(readdirSync(join(dir, 'src')).filter((f) => f.endsWith('.tsx') || f.endsWith('.ts') || f.endsWith('.css')).sort()).toEqual(
+        dir === app ? ['App.tsx', 'main.tsx'] : ['App.tsx', 'entry-client.tsx', 'entry-server.tsx'],
+      );
+    }
+    expect(existsSync(join(ssr, 'src/components/Quote.tsx'))).toBe(true);
+    expect(existsSync(join(ssr, 'src/lib/quotes.ts'))).toBe(true);
+    expect(readFileSync(join(app, 'src/main.tsx'), 'utf8')).toContain("import './styles/global.css'");
+    expect(readFileSync(join(ssr, 'index.html'), 'utf8')).toContain('href="/src/styles/global.css"');
+    expect(readJson(join(ssr, 'package.json')).scripts.dev).toBe('node server/index.js');
   });
 
   it('refuses a folder that already has files, but accepts one with only .git', () => {

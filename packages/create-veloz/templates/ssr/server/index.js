@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const prod = process.argv.includes('--prod');
 const port = Number(process.env.PORT) || 3000;
-const root = fileURLToPath(new URL('.', import.meta.url));
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 const TYPES = {
   '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png',
@@ -20,7 +20,7 @@ let render;
 
 if (prod) {
   template = readFileSync(join(root, 'dist/client/index.html'), 'utf8');
-  ({ render } = await import(new URL('./dist/server/entry-server.js', import.meta.url).href));
+  ({ render } = await import(new URL('../dist/server/entry-server.js', import.meta.url).href));
 } else {
   const { createServer } = await import('vite');
   vite = await createServer({ root, server: { middlewareMode: true }, appType: 'custom' });

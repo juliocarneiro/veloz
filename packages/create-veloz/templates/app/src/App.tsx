@@ -1,5 +1,5 @@
-import { Counter } from './Counter';
-import { Logo } from './Logo';
+import { Counter } from './components/Counter';
+import { Logo } from './components/Logo';
 
 export function App() {
   return (

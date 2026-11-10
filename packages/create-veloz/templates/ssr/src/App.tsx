@@ -1,6 +1,6 @@
-import { Counter } from './Counter';
-import { Logo } from './Logo';
-import { Quote } from './Quote';
+import { Counter } from './components/Counter';
+import { Logo } from './components/Logo';
+import { Quote } from './components/Quote';
 
 export function App() {
   return (
