@@ -1,5 +1,5 @@
 import { createResource, Suspense } from '@velozjs/dom';
-import { getQuote } from './api';
+import { getQuote } from '../lib/quotes';
 
 export function Quote() {
   // On the server, renderToStringAsync waits for this before sending the page.

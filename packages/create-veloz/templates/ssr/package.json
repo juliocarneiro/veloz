@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "node server/index.js",
     "build": "tsc && vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server",
-    "start": "node server.js --prod"
+    "start": "node server/index.js --prod"
   },
   "dependencies": {
     "@velozjs/dom": "__VELOZ_VERSION__",

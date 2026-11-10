@@ -1,5 +1,14 @@
 # Changelog
 
+## create-veloz 0.1.2
+
+Generated projects are organized by role instead of keeping everything flat in `src/`:
+
+- `src/components/` for components, `src/styles/global.css` for styles and, in the `ssr` template, `src/lib/quotes.ts` for the data source.
+- The `ssr` server moved from `server.js` at the root to `server/index.js`, so the root only holds configuration (`index.html`, `vite.config.ts`, `tsconfig.json`, `package.json`).
+- The `app` template imports its CSS from `src/main.tsx`, the usual Vite setup. The `ssr` template keeps the `<link>` in `index.html`, so server-rendered pages are styled before any JavaScript runs.
+- Each template README shows the folder layout.
+
 ## 0.1.2
 
 Found while moving the salve-css site to Veloz.
