@@ -30,6 +30,20 @@ npm create veloz@latest
 
 Pick a template (`app` for a single-page app, `ssr` for server rendering with async data), and it installs everything and tells you how to start. Vite, TypeScript and the plugin come configured.
 
+To skip the prompts, pass the folder name and options (with npm, options go after `--`):
+
+```bash
+npm create veloz@latest my-app -- --template ssr --install
+```
+
+| Option | What it does |
+| --- | --- |
+| `-t, --template <app\|ssr>` | Template to use. |
+| `--install` / `--no-install` | Install dependencies without asking / skip installing. |
+| `-h, --help` | Show the options. |
+
+The folder must be empty or not exist yet. It also works with `pnpm create veloz`, `yarn create veloz` and `bun create veloz`, and installs with the package manager that ran it. Outside a terminal (CI, scripts) it never asks: it uses `veloz-app`, the `app` template and does not install.
+
 ### Adding Veloz to an existing project
 
 ```bash
@@ -270,6 +284,7 @@ Resources are matched between server and client by creation order. If a componen
 ### How it fits together
 
 - With `vite-plugin-veloz`, app imports of `@velozjs/dom` resolve to `@velozjs/ssr` during SSR (dev and `vite build --ssr`), so components are shared as is.
+- To keep a dependency's own imports of `@velozjs/dom` unchanged during SSR, list it in `exclude`: `veloz({ exclude: ['my-widgets'] })`. Imports from `@velozjs/*` packages are never redirected.
 - The server tags elements with `data-hk` keys and wraps dynamic regions in `<!--[-->…<!--]-->` comments. `hydrate()` reuses those elements, attaches events and effects, and removes the keys.
 - Styles from `css`, `styled` and the `css` prop are collected on the server; the client detects them and does not inject them again.
 - `renderToStream()` returns a byte stream (styles first) you can pass to `new Response()`. Like `renderToString`, it does not wait for data.
@@ -293,13 +308,41 @@ Details in [SECURITY.md](SECURITY.md).
 
 `@velozjs/dom` also exports `createElement(tag, props, ...children)`, so you can use it with any JSX setup (`jsxFactory`) or without JSX.
 
-## Development
+## Examples
+
+| Folder | What it shows |
+| --- | --- |
+| [`examples/todomvc`](examples/todomvc) | A single-page TodoMVC: state in a store module, `For` with keyed rows, `Show`, memos and `css` styles. |
+| [`examples/ssr`](examples/ssr) | A Vite dev server in middleware mode: `renderToString` on the server, `hydrate` in the browser. |
+
+Both are workspace packages that use the built packages, so build first:
 
 ```bash
 pnpm install
-pnpm test        # vitest (core, dom, css, ssr, vite-plugin)
-pnpm typecheck
 pnpm build
+pnpm --filter veloz-example-todomvc dev
+pnpm --filter veloz-example-ssr dev       # http://localhost:3000
+```
+
+## Development
+
+```
+packages/
+  core/           @velozjs/core
+  dom/            @velozjs/dom
+  css/            @velozjs/css
+  ssr/            @velozjs/ssr
+  vite-plugin/    vite-plugin-veloz
+  create-veloz/   create-veloz (CLI and the app / ssr templates)
+examples/         todomvc, ssr
+type-tests/       compile-time tests for the public types
+```
+
+```bash
+pnpm install
+pnpm test        # vitest against the sources, no build needed (core, dom, css, ssr, vite-plugin, create-veloz)
+pnpm typecheck   # the packages, type-tests/ and the create-veloz templates
+pnpm build       # tsup, each package to its dist/
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
